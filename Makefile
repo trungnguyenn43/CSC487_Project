@@ -1,12 +1,22 @@
+Sequence: Server Client
 
-output: Main.o
-	g++ -o output Main.o
+Server: Server.o 
+	g++ -o Server  Server.o 
 
-Main.o: Main.c
-	g++ -c -g -std=c++11 Main.c
+Server.o: Server.c
+	g++ -c -g -std=c++11 Server.c
+
+Client: Client.o
+	g++ -o Client  Client.o 
+
+Client.o: Client.c
+	g++ -c -g -std=c++11 Client.c	
+
+SDES: SDES.o
+	g++ -o SDES SDES.c
 
 SDES.o: SDES.c
 	g++ -c -g -std=c++11 SDES.c
 
 clean:
-	rm -f output Main.o
+	rm -f Server Client *.o

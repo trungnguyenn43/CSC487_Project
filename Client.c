@@ -29,7 +29,7 @@ int main(int argc , char *argv[])
 	}
 		
 // *********** This is the line you need to edit ****************
-	server.sin_addr.s_addr = inet_addr("localhost");  // doesn't like localhost?
+	server.sin_addr.s_addr = inet_addr("10.0.0.2");  // doesn't like localhost?
 	server.sin_family = AF_INET;
 	server.sin_port = htons( 8421 );    // random "high"  port number
 
