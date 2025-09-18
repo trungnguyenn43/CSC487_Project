@@ -1,0 +1,47 @@
+version: '3.9'
+
+services:
+  ubuntu_vm1:
+    image: ubuntu:latest
+    container_name: Machine_1
+    build:
+      context: .
+      dockerfile: Dockerfile
+    stdin_open: true
+    tty: true
+    networks:
+      internal_net:
+        aliases:
+          - vm1
+        ipv4_address: 0.0.0.2
+    volumes:
+      - type: bind
+        source: ./
+        target: /data
+
+  ubuntu_vm2:
+    image: ubuntu:latest
+    container_name: Machine_2
+    build:
+      context: .
+      dockerfile: Dockerfile
+    stdin_open: true
+    tty: true
+    networks:
+      internal_net:
+        aliases:
+          - vm2
+        ipv4_address: 0.0.0.3
+        
+    volumes:
+      - type: bind
+        source: ./
+        target: /data
+
+networks:
+  internal_net:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 0.0.0.0/24
