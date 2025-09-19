@@ -12,6 +12,9 @@
 #include<sys/socket.h>
 #include<arpa/inet.h>  // for inet_addr and sockaddr_in structs
 
+const char* SERVER_ADDR = "10.0.0.2"; // IP address of the server
+const int SERVER_PORT = 49512; // Port number of the server
+
 int main(int argc , char *argv[])
 {
 	int socket_desc;    // file descripter returned by socket command
@@ -29,9 +32,9 @@ int main(int argc , char *argv[])
 	}
 		
 // *********** This is the line you need to edit ****************
-	server.sin_addr.s_addr = inet_addr("localhost");  // doesn't like localhost?
+	server.sin_addr.s_addr = inet_addr(SERVER_ADDR);  // using SERVER_ADDR for server IP
 	server.sin_family = AF_INET;
-	server.sin_port = htons( 8421 );    // random "high"  port number
+	server.sin_port = htons( SERVER_PORT );    // random "high"  port number
 
 	//Connect to remote server
 	if (connect(socket_desc , (struct sockaddr *)&server , sizeof(server)) < 0)
