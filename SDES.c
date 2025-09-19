@@ -95,6 +95,32 @@ void keyGen(char* key) {
     char* p10_output = p10_block(key); // Apply P10 permutation
 
     printf("P10 Output: %s\n", p10_output);
+
+    // Split the permuted key into two halves
+    char left[6], right[6]; // 5 bits each + null terminator
+    strncpy(left, p10_output, 5);
+    left[5] = '\0'; // Null terminate
+    strncpy(right, p10_output + 5, 5);
+    right[5] = '\0'; // Null terminate
+
+    // Perform left shifts
+    char* ls1_left = ls_block(left, 1);
+    char* ls1_right = ls_block(right, 1);
+    printf("LS1 Left: %s, LS1 Right: %s\n", ls1_left, ls1_right);
+
+    //P8 permutation to get KEY1
+    strcpy(KEY1, p8_block(ls1_left, ls1_right));
+    printf("KEY1: %s\n", KEY1);
+
+    // Perform second left shifts
+    char* ls2_left = ls_block(ls1_left, 2);
+    char* ls2_right = ls_block(ls1_right, 2);
+    printf("LS2 Left: %s, LS2 Right: %s\n", ls2_left, ls2_right);
+
+    //P8 permutation to get KEY2
+    strcpy(KEY2, p8_block(ls2_left, ls2_right));
+    printf("KEY2: %s\n", KEY2);
+
     
 }
 
@@ -119,7 +145,7 @@ char* p10_block(char* input) {
     return output;
 }
 
-//* Left Shift Block *//
+//* Left Shift Block with Shift Count *//
 char* ls_block(char* input, int shiftCount) {
     int size = strlen(input); // Get the input string length
 
@@ -138,7 +164,22 @@ char* ls_block(char* input, int shiftCount) {
 }
 
 char* p8_block(char* left, char* right) {
-    char* output;
+    static char output[9]; // 8 bits + null terminator
+    memset(output, 0, sizeof(output)); // Clear the output array
+
+    char input[17]; // 16 bits from left and right + null terminator
+    strcpy(input, left);
+    strcat(input, right);
+
+    output[0] = input[5]; 
+    output[1] = input[2]; 
+    output[2] = input[6]; 
+    output[3] = input[3]; 
+    output[4] = input[7]; 
+    output[5] = input[4]; 
+    output[6] = input[9]; 
+    output[7] = input[8]; 
+
     return output;
 }
 
