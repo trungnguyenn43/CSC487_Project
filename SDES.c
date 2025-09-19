@@ -24,7 +24,7 @@ char* SDES(char* plaintextInput, char* keyInput) {
         return NULL;
     }
 
-    if(keyInput[0] != '0' && keyInput[0] != '1'){ // Fixed logical condition
+    if(keyInput[0] != '0' && keyInput[0] != '1' && keyInput[0] != '2' && keyInput[0] != '3'){ // Fixed logical condition
         fprintf(stderr, "Error: Invalid plaintext input (code: 2)\n");
         return NULL;
     }
