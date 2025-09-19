@@ -9,6 +9,9 @@
 #include <sys/socket.h>
 #include <arpa/inet.h> //inet_addr
 
+const int SERVER_PORT = 49512; // Port number of the server
+
+
 int main(int argc , char *argv[])
 {
 	int socket_desc , new_socket , c, read_size, i;
@@ -22,49 +25,49 @@ int main(int argc , char *argv[])
 	socket_desc = socket(AF_INET , SOCK_STREAM , 0);
 	if (socket_desc == -1)
 	{
-		printf("Could not create socket");
+		printf("ERROR: Could not create socket");
 	}
 	
 	//Prepare the sockaddr_in structure
 	server.sin_family = AF_INET;
-	server.sin_addr.s_addr = INADDR_ANY;
-	server.sin_port = htons( 8421 );                 // Random high (assumed unused) port
+	server.sin_addr.s_addr = INADDR_ANY; 					// From any network interface
+	server.sin_port = htons( SERVER_PORT );                 // Random high (assumed unused) port
 	
 	//Bind
 	if( bind(socket_desc,(struct sockaddr *)&server , sizeof(server)) < 0)
 	{
-		printf(" unable to bind\n");
+		printf("ERROR: unable to bind\n");
 		return 1;
 	}
-	printf(" socket bound, ready for and waiting on a client\n");
+
+	//Print server details
+	printf("INFO: Server IP: %s, Port: %d\n", inet_ntoa(server.sin_addr), ntohs(server.sin_port));
+	printf("INFO: Server listening on port %d\n", ntohs(server.sin_port));
+	printf("INFO: Socket bound, ready for and waiting on a client\n");
 	
 	//Listen
 	listen(socket_desc , 3);
 	
 	//Accept incoming connection
-	printf(" Waiting for incoming connections... \n");
+	printf("INFO: Waiting for incoming connections... \n");
 	
 	
 	c = sizeof(struct sockaddr_in);
 	new_socket = accept(socket_desc, (struct sockaddr *)&client, (socklen_t*)&c);
+
 	if (new_socket<0)
 	{
-		perror("accept failed");
+		perror("ERROR: accept failed");
 		return 1;
 	}
 	
-	printf("Connection accepted\n");
-
-	
-	//Reply to the client
-	message = "You have located Server X at our undisclosed location.  What would you like to say?\n";
-	//write(new_socket , message , strlen(message));
+	printf("INFO: Connection accepted\n");
+	printf("INFO: Client connected from IP: %s, Port: %d\n", inet_ntoa(client.sin_addr), ntohs(client.sin_port));
 	
 	//Receive a message from client
 	while( (read_size = recv(new_socket , client_message , 100 , 0)) > 0 )
 	{
-
-		printf("\n Client sent %2i byte message:  %.*s\n",read_size, read_size ,client_message);
+		printf("\nINFO: Client sent %2i byte message:  %.*s\n",read_size, read_size ,client_message);
 
 		if(!strncmp(client_message,"showMe",6)) 
 		{
@@ -79,22 +82,23 @@ int main(int argc , char *argv[])
 				client_message[i] = 'z';
 		}
 
-               	printf(" Sending back Z'd up message:  %.*s \n", read_size ,client_message);
+            printf("INFO: Sending back Z'd up message:  %.*s \n", read_size ,client_message);
 
 		//write(new_socket, client_message , strlen(client_message));
 		write(new_socket, client_message , read_size);
+		
+		
+		if(read_size == 0)
+		{
+			printf("INFO: client disconnected\n");
+			fflush(stdout);
+		}
+		else if(read_size == -1)
+		{
+			perror("ERROR: receive failed");
+		}
 	}
 	
-	if(read_size == 0)
-	{
-		printf("client disconnected\n");
-		fflush(stdout);
-	}
-	else if(read_size == -1)
-	{
-		perror("receive failed");
-	}
-		
 	//Free the socket pointer
 	close(socket_desc);
 	return 0;
