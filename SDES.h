@@ -3,7 +3,7 @@
 // Entry point
 char* SDES(char*, char*);
 
-void hex2Bin(const char*);
+char* hex2Bin(const char*);
 
 char* hexDigitsToBin(const char);
 

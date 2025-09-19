@@ -9,7 +9,7 @@
 //* Global Variables *//
 #pragma region global variables
 extern char plaintext[9] = ""; // 8-bit binary string + null terminator \a
-extern char key[11] = "";       // 10-bit key + null terminator
+extern char keytext[13] = "";       // 12-bit key + null terminator. THe first 2 bits are ignored
 char KEY1[9] = "";       // First 8-bit subkey + null terminator
 char KEY2[9] = "";       // Second 8-bit subkey + null terminator
 #pragma endregion
@@ -18,6 +18,7 @@ char KEY2[9] = "";       // Second 8-bit subkey + null terminator
 //* Entry Point of the SDES algorithm *//
 char* SDES(char* plaintextInput, char* keyInput) {
     
+    // ? Validate inputs
     if(plaintextInput == NULL || keyInput == NULL) {
         fprintf(stderr, "Error: Empty input (code: 1)\n");
         return NULL;
@@ -29,24 +30,29 @@ char* SDES(char* plaintextInput, char* keyInput) {
     }
 
     // Convert the plaintext and key from hex to binary
-    hex2Bin(plaintextInput);
-    hex2Bin(keyInput);
+    strcpy(plaintext, hex2Bin(plaintextInput));
+    strcpy(keytext, hex2Bin(keyInput));
 
     return plaintext;
 }
 
 //* Convert Hexadecimal to Binary *//
-void hex2Bin(const char* hex) {
+char* hex2Bin(const char* hex) {
+
+    char* output = "";
+
     // Convert each hex digit to its 4-bit binary equivalent
     for (int i = 0; i < strlen(hex); i++) {
         char* bin = hexDigitsToBin(hex[i]);
         if (bin == NULL) {
-            // Clear the plaintext in case of error
-            memset(plaintext, 0, sizeof(plaintext));
+            // Clear the output in case of error
+            memset(output, 0, sizeof(output));
             return;
         }
-        strcat(plaintext, bin);
+        strcat(output, bin);
     }
+
+    return output;
 }
 
 char* hexDigitsToBin(const char hex) {
