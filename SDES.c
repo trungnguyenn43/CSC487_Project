@@ -8,8 +8,8 @@
 
 //* Global Variables *//
 #pragma region global variables
-extern char plaintext[9] = ""; // 8-bit binary string + null terminator \a
-extern char keytext[13] = "";       // 12-bit key + null terminator. THe first 2 bits are ignored
+extern char plaintext[9] = ""; // 8-bit binary string + null terminator \0
+extern char keytext[13] = "";       // 12-bit key + null terminator. The first 2 bits are ignored
 char KEY1[9] = "";       // First 8-bit subkey + null terminator
 char KEY2[9] = "";       // Second 8-bit subkey + null terminator
 #pragma endregion
@@ -29,25 +29,43 @@ char* SDES(char* plaintextInput, char* keyInput) {
         return NULL;
     }
 
-    // Convert the plaintext and key from hex to binary
-    strcpy(plaintext, hex2Bin(plaintextInput));
-    strcpy(keytext, hex2Bin(keyInput));
+        
+    {   // Initial step: Convert the plaintext and key from hex to binary
+        strcpy(plaintext, hex2Bin(plaintextInput));
+        strcpy(keytext, hex2Bin(keyInput));
 
+        
+        //*Ignore the first 2 bits of the key
+        // shift left by 2 to move the first 2 bits to last 2 positions
+        strcpy(keytext, ls_block(keytext, 2));
+        keytext[strlen(keytext)-1] = '\0'; // Null terminate after ignoring first 2 bits
+        keytext[strlen(keytext)-1] = '\0';
+
+        //little note: strlen -> count the character in the string until it reach null terminator \0
+        //hence, -1 to get the last character always
+    }
+
+    
     return plaintext;
 }
 
 //* Convert Hexadecimal to Binary *//
 char* hex2Bin(const char* hex) {
 
-    char* output = "";
+    char* output = (char*) malloc( (strlen(hex) * 4 + 1) * sizeof(char) ); // 4 bits per hex digit + null terminator
+
+    if(output == NULL) {
+        fprintf(stderr, "Error: Memory allocation failed (code: 3)\n");
+        return NULL;
+    }
 
     // Convert each hex digit to its 4-bit binary equivalent
     for (int i = 0; i < strlen(hex); i++) {
         char* bin = hexDigitsToBin(hex[i]);
-        if (bin == NULL) {
+        if (bin == NULL || *bin == '\0') {
             // Clear the output in case of error
-            memset(output, 0, sizeof(output));
-            return;
+            memset(output, 0, strlen(output));
+            return NULL;
         }
         strcat(output, bin);
     }
@@ -89,16 +107,25 @@ char* p10_block(char* input) {
     return output;
 }
 
-char* ls_block(char* input, int shifts) {
-    char* output;
-    for (int i = 0; i < shifts; i++) {
+char* ls_block(char* input, int shiftCount) {
+    
+    int size = strlen(input); // Get the input string length
+
+    for(int i = 0; i < shiftCount; i++) {
+        // Store the first bit
         char first_bit = input[0];
-        for (int j = 0; j < 4; j++) {
+        
+        // Shift all bits to the left
+        for (int j = 0; j < size; j++) {
             input[j] = input[j + 1];
         }
-        input[4] = first_bit;
+
+        // Place the first bit at the end
+        input[size - 1] = first_bit;
+
     }
-    return output;
+    
+    return input;
 }
 
 char* p8_block(char* left, char* right) {

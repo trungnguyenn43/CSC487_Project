@@ -12,12 +12,9 @@ int main(){
     scanf("%2s", plaintext);
 
     printf("Enter 3-digit hexadecimal key: ");
-    scanf("%2s", key);
+    scanf("%3s", key);
 
     char* output = SDES(plaintext, key);
-    printf("Plaintext: %s\n", plaintext);
-    printf("Key: %s\n", key);
-
 
     return 0;
 }
