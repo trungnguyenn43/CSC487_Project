@@ -17,57 +17,48 @@ char KEY2[9] = "";       // Second 8-bit subkey + null terminator
 
 //* Entry Point of the SDES algorithm *//
 char* SDES(char* plaintextInput, char* keyInput) {
-    
-    // ? Validate inputs
-    if(plaintextInput == NULL || keyInput == NULL) {
+    // Validate inputs
+    if (plaintextInput == NULL || keyInput == NULL) {
         fprintf(stderr, "Error: Empty input (code: 1)\n");
         return NULL;
     }
 
-    if(keyInput[0] != '0' && keyInput[0] != '1' && keyInput[0] != '2' && keyInput[0] != '3'){ // Fixed logical condition
+    // Check if the first character of the keyInput is valid
+    if (keyInput[0] != '0' && keyInput[0] != '1' && keyInput[0] != '2' && keyInput[0] != '3') {
         fprintf(stderr, "Error: Invalid plaintext input (code: 2)\n");
         return NULL;
     }
 
-        
-    {   // Initial step: Convert the plaintext and key from hex to binary
-        strcpy(plaintext, hex2Bin(plaintextInput));
-        strcpy(keytext, hex2Bin(keyInput));
+    {   // Convert plaintext and key from hex to binary
+        strcpy(plaintext, hex2Bin(plaintextInput)); // Convert plaintext
+        strcpy(keytext, hex2Bin(keyInput));         // Convert key
 
-        
-        //*Ignore the first 2 bits of the key
-        // shift left by 2 to move the first 2 bits to last 2 positions
+        // Ignore the first 2 bits of the key by left-shifting twice
         strcpy(keytext, ls_block(keytext, 2));
-        keytext[strlen(keytext)-1] = '\0'; // Null terminate after ignoring first 2 bits
-        keytext[strlen(keytext)-1] = '\0';
-
-        //little note: strlen -> count the character in the string until it reach null terminator \0
-        //hence, -1 to get the last character always
+        keytext[strlen(keytext) - 1] = '\0'; // Null terminate after ignoring first 2 bits
+        keytext[strlen(keytext) - 1] = '\0'; // Ensure null termination
     }
 
-    
+    // Generate the two subkeys K1 and K2
+    keyGen(keytext);
+
     return plaintext;
 }
 
 //* Convert Hexadecimal to Binary *//
 char* hex2Bin(const char* hex) {
-
-    char* output = (char*) malloc( (strlen(hex) * 4 + 1) * sizeof(char) ); // 4 bits per hex digit + null terminator
-
-    if(output == NULL) {
-        fprintf(stderr, "Error: Memory allocation failed (code: 3)\n");
-        return NULL;
-    }
+    static char output[65]; // Maximum 16 hex digits * 4 bits + null terminator
+    memset(output, 0, sizeof(output)); // Clear the output array
 
     // Convert each hex digit to its 4-bit binary equivalent
     for (int i = 0; i < strlen(hex); i++) {
-        char* bin = hexDigitsToBin(hex[i]);
+        const char* bin = hexDigitsToBin(hex[i]);
         if (bin == NULL || *bin == '\0') {
-            // Clear the output in case of error
-            memset(output, 0, strlen(output));
-            return NULL;
+            fprintf(stderr, "Error: Invalid hex digit '%c' (code: 2)\n", hex[i]);
+            output[0] = '\0'; // Clear output on error
+            return output;
         }
-        strcat(output, bin);
+        strcat(output, bin); // Append binary representation
     }
 
     return output;
@@ -98,33 +89,51 @@ char* hexDigitsToBin(const char hex) {
     }
 }
 
+//entry point for key generator
 void keyGen(char* key) {
     // Generate the two subkeys K1 and K2 from the original 10-bit key
+    char* p10_output = p10_block(key); // Apply P10 permutation
+
+    printf("P10 Output: %s\n", p10_output);
+    
 }
 
+//* Apply P10 Permutation *//
 char* p10_block(char* input) {
-    char* output;
+    static char output[11]; // 10 bits + null terminator
+    memset(output, 0, sizeof(output)); // Clear the output array
+
+    // Apply the P10 permutation
+    output[0] = input[2];
+    output[1] = input[4];
+    output[2] = input[1];
+    output[3] = input[6];
+    output[4] = input[3];
+    output[5] = input[9];
+    output[6] = input[0];
+    output[7] = input[8];
+    output[8] = input[7];
+    output[9] = input[6];
+    output[10] = '\0'; // Null terminator
+
     return output;
 }
 
+//* Left Shift Block *//
 char* ls_block(char* input, int shiftCount) {
-    
     int size = strlen(input); // Get the input string length
 
-    for(int i = 0; i < shiftCount; i++) {
-        // Store the first bit
-        char first_bit = input[0];
-        
+    for (int i = 0; i < shiftCount; i++) {
+        char first_bit = input[0]; // Store the first bit
+
         // Shift all bits to the left
-        for (int j = 0; j < size; j++) {
+        for (int j = 0; j < size - 1; j++) {
             input[j] = input[j + 1];
         }
 
-        // Place the first bit at the end
-        input[size - 1] = first_bit;
-
+        input[size - 1] = first_bit; // Place the first bit at the end
     }
-    
+
     return input;
 }
 
@@ -162,4 +171,3 @@ char* p4_block(char* input) {
     char* output;
     return output;
 }
-
