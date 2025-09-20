@@ -1,29 +1,39 @@
 #pragma once
 
+//External global variables
+extern char plaintext[9]; // 8-bit binary string + null terminator \0
+extern char keytext[13];  // 12-bit key + null terminator. The first 2 bits are ignored
+
 // Entry point
 char* SDES(char*, char*);
 
 char* hex2Bin(const char*);
 
-char* hexDigitsToBin(const char);
+const char* hexDigitsToBin(const char);
 
-void keyGen(char*);
+void keyGen(const char*);
 
-char* p10_block(char*);
+char* p10_block(const char*);
 
 char* ls_block(char*, const int);
 
-char* p8_block(char*, char*);
+char* p8_block(const char*, const char*);
 
-char* ip_block(char*);
+char* fk_block(char*, char*);
 
-char* ip1_block(char*);
+char* ip_block(const char*);
 
-char* ep_block(char*);
+char* ip1_block(const char*);
 
-char* s1_block(char*);
+char* ep_block(const char*);
 
-char* s2_block(char*);
+char* s0_block(const char*);
 
-char* p4_block(char*);
+char* s1_block(const char*);
+
+char* p4_block(const char*);
+
+char OR(char, char);
+
+char XOR(char, char);
 

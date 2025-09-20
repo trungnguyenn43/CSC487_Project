@@ -16,5 +16,7 @@ int main(){
 
     char* output = SDES(plaintext, key);
 
+    
+
     return 0;
 }

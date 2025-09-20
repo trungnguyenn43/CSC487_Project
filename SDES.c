@@ -8,10 +8,10 @@
 
 //* Global Variables *//
 #pragma region global variables
-extern char plaintext[9] = ""; // 8-bit binary string + null terminator \0
-extern char keytext[13] = "";       // 12-bit key + null terminator. The first 2 bits are ignored
-char KEY1[9] = "";       // First 8-bit subkey + null terminator
-char KEY2[9] = "";       // Second 8-bit subkey + null terminator
+char plaintext[9] = ""; // 8-bit binary string + null terminator \0
+char keytext[13] = "";  // 12-bit key + null terminator. The first 2 bits are ignored
+char KEY1[9] = "";      // First 8-bit subkey + null terminator
+char KEY2[9] = "";      // Second 8-bit subkey + null terminator
 #pragma endregion
 
 
@@ -42,6 +42,23 @@ char* SDES(char* plaintextInput, char* keyInput) {
     // Generate the two subkeys K1 and K2
     keyGen(keytext);
 
+    //IP block
+    strcpy(plaintext, ip_block(plaintext)); // Initial Permutation (IP)
+    
+    //1st Fk function
+    {
+        char leftPlainText[5], rightPlainText[5], tempPlainText[5]; // 4 bits each + null terminator
+        strncpy(leftPlainText, plaintext, 4);
+        leftPlainText[4] = '\0'; // Null terminate
+        strncpy(rightPlainText, plaintext + 4, 4);
+        rightPlainText[4] = '\0'; // Null terminate
+
+        printf("Left PlainText: %s\n", leftPlainText);
+        printf("Right PlainText: %s\n", rightPlainText);
+        
+        fk_block(leftPlainText, rightPlainText);
+    }
+
     return plaintext;
 }
 
@@ -64,7 +81,7 @@ char* hex2Bin(const char* hex) {
     return output;
 }
 
-char* hexDigitsToBin(const char hex) {
+const char* hexDigitsToBin(const char hex) {
     // Return a static binary string for each hex digit
     switch (toupper(hex)) {
         case '0': return "0000";
@@ -90,11 +107,9 @@ char* hexDigitsToBin(const char hex) {
 }
 
 //entry point for key generator
-void keyGen(char* key) {
+void keyGen(const char* key) {
     // Generate the two subkeys K1 and K2 from the original 10-bit key
     char* p10_output = p10_block(key); // Apply P10 permutation
-
-    printf("P10 Output: %s\n", p10_output);
 
     // Split the permuted key into two halves
     char left[6], right[6]; // 5 bits each + null terminator
@@ -106,26 +121,21 @@ void keyGen(char* key) {
     // Perform left shifts
     char* ls1_left = ls_block(left, 1);
     char* ls1_right = ls_block(right, 1);
-    printf("LS1 Left: %s, LS1 Right: %s\n", ls1_left, ls1_right);
 
     //P8 permutation to get KEY1
     strcpy(KEY1, p8_block(ls1_left, ls1_right));
-    printf("KEY1: %s\n", KEY1);
 
     // Perform second left shifts
     char* ls2_left = ls_block(ls1_left, 2);
     char* ls2_right = ls_block(ls1_right, 2);
-    printf("LS2 Left: %s, LS2 Right: %s\n", ls2_left, ls2_right);
 
     //P8 permutation to get KEY2
     strcpy(KEY2, p8_block(ls2_left, ls2_right));
-    printf("KEY2: %s\n", KEY2);
 
-    
 }
 
 //* Apply P10 Permutation *//
-char* p10_block(char* input) {
+char* p10_block(const char* input) {
     static char output[11]; // 10 bits + null terminator
     memset(output, 0, sizeof(output)); // Clear the output array
 
@@ -163,7 +173,7 @@ char* ls_block(char* input, int shiftCount) {
     return input;
 }
 
-char* p8_block(char* left, char* right) {
+char* p8_block(const char* left, const char* right) {
     static char output[9]; // 8 bits + null terminator
     memset(output, 0, sizeof(output)); // Clear the output array
 
@@ -183,32 +193,178 @@ char* p8_block(char* left, char* right) {
     return output;
 }
 
-char* ip_block(char* input) {
-    char* output;
+char* fk_block(char* left, char* right) {
+    
+    char rightPart[5];
+    static char leftPart[5]; // 4 bits + null terminator -> output
+    memset(rightPart, 0, sizeof(rightPart)); // Clear the rightPart array
+    memset(leftPart, 0, sizeof(leftPart));   // Clear the leftPart array
+
+    strcpy(rightPart, right); // Copy right to rightPart
+    strcpy(leftPart, left);   // Copy left to leftPart
+    rightPart[4] = '\0'; // Null terminate
+    leftPart[4] = '\0';  // Null terminate
+
+    //EP block
+    char expandedRight[9]; // 8 bits + null terminator
+    memset(expandedRight, 0, sizeof(expandedRight)); // Clear the expandedRight array
+    strcpy(expandedRight, ep_block(rightPart));
+
+    //XOR with KEY1
+    for (int i = 0; i < 9; i++) {
+        expandedRight[i] = XOR(expandedRight[i], KEY1[i]);
+    }
+    expandedRight[8] = '\0'; // Null terminate
+    
+    //S1 and S2 blocks
+    char S0_output[3], S1_output[3]; // 2 bits each + null terminator
+    char temp[5]; // Temporary storage for splitting
+    strncpy(temp, expandedRight, 4);
+    temp[4] = '\0'; // Ensure null termination
+    strcpy(S0_output, s0_block(temp));
+
+    strncpy(temp, expandedRight + 4, 4);
+    temp[4] = '\0'; // Ensure null termination
+    strcpy(S1_output, s1_block(temp));
+
+    //P4 block
+    char P4_input[5]; // 4 bits + null terminator
+    strcpy(P4_input, S0_output);
+    strcat(P4_input, S1_output);
+    P4_input[4] = '\0'; // Null terminate
+    printf("P4 input: %s\n", P4_input);
+    
+    strcpy(temp, p4_block(P4_input));
+    printf("P4 output: %s\n", temp);
+    printf("Left Part before XOR: %s\n", leftPart);
+    
+    //XOR with left
+    for (int i = 0; i < 5; i++) {
+        leftPart[i] = XOR(leftPart[i], temp[i]);
+    }
+
+    printf("Left Part after XOR: %s\n", leftPart);
+    return leftPart;
+}
+
+char* ip_block(const char* input) {
+    static char output[9]; // 8 bits + null terminator
+    memset(output, 0, sizeof(output)); // Clear the output array
+
+    // Apply the IP permutation
+    output[0] = input[1]; 
+    output[1] = input[5]; 
+    output[2] = input[2]; 
+    output[3] = input[0]; 
+    output[4] = input[3]; 
+    output[5] = input[7]; 
+    output[6] = input[4]; 
+    output[7] = input[6];
+    output[8] = '\0'; // Null terminator
+
     return output;
 }
 
-char* ip1_block(char* input) {
-    char* output;
+char* ip1_block(const char* input) {
+    static char output[9]; // 8 bits + null terminator
+    memset(output, 0, sizeof(output)); // Clear the output array
+
+    // Apply the IP-1 permutation
+    output[0] = input[3]; 
+    output[1] = input[0]; 
+    output[2] = input[2]; 
+    output[3] = input[4]; 
+    output[4] = input[6]; 
+    output[5] = input[1]; 
+    output[6] = input[7]; 
+    output[7] = input[5];
+    output[8] = '\0'; // Null terminator
+
     return output;
 }
 
-char* ep_block(char* input) {
-    char* output;
+char* ep_block(const char* input) {
+    static char output[9]; // 8 bits + null terminator
+    memset(output, 0, sizeof(output)); // Clear the output array
+
+    // Apply the EP permutation
+    output[0] = input[3]; 
+    output[1] = input[0]; 
+    output[2] = input[1]; 
+    output[3] = input[2]; 
+    output[4] = input[1]; 
+    output[5] = input[2]; 
+    output[6] = input[3]; 
+    output[7] = input[0]; 
+    output[8] = '\0'; // Null terminator
+
     return output;
 }
 
-char* s1_block(char* input) {
-    char* output;
+char* s0_block(const char* input) {
+    static char output[3]; // 2 bits + null terminator
+    memset(output, 0, sizeof(output)); // Clear the output array
+
+    const char* permuteArray[4][4] = {
+        {"01", "00", "11", "10"},
+        {"11", "10", "01", "00"},
+        {"00", "10", "01", "11"},
+        {"11", "01", "11", "10"}
+    };
+
+    //convert to int
+    int row = (input[0] - '0') * 2 + (input[3] - '0');
+    int col = (input[1] - '0') * 2 + (input[2] - '0');
+
+    //copy the result
+    strcpy(output, permuteArray[row][col]);
+
     return output;
 }
 
-char* s2_block(char* input) {
-    char* output;
+char* s1_block(const char* input) {
+    static char output[3]; // 2 bits + null terminator
+    memset(output, 0, sizeof(output)); // Clear the output array
+
+    const char* permuteArray[4][4] = {
+        {"00", "01", "10", "11"},
+        {"10", "00", "01", "11"},
+        {"11", "00", "01", "00"},
+        {"10", "01", "00", "11"}
+    };
+    
+    //convert to int
+    int row = (input[0] - '0') * 2 + (input[3] - '0');
+    int col = (input[1] - '0') * 2 + (input[2] - '0');
+
+    //copy the result
+    strcpy(output, permuteArray[row][col]);
+
     return output;
 }
 
-char* p4_block(char* input) {
-    char* output;
+//TODO: Fix this function to return correct P4 output
+char* p4_block(const char* input) {
+    static char output[5]; // 4 bits + null terminator
+    memset(output, 0, sizeof(output)); // Clear the output array
+
+    printf("P4 input inside p4_block: %s\n", input);
+
+    output[0] = input[2]; 
+    output[1] = input[4]; 
+    output[2] = input[3]; 
+    output[3] = input[1];
+    output[4] = '\0'; // Null terminator 
+
+    printf("P4 output inside p4_block: %s\n", output);
+
     return output;
+}
+
+char OR(char a, char b) {
+    return (a == '1' || b == '1') ? '1' : '0';
+}
+
+char XOR(char a, char b) {
+    return (a != b) ? '1' : '0';
 }
