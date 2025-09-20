@@ -46,18 +46,29 @@ char* SDES(char* plaintextInput, char* keyInput) {
     strcpy(plaintext, ip_block(plaintext)); // Initial Permutation (IP)
     
     //1st Fk function
-    {
-        char leftPlainText[5], rightPlainText[5], tempPlainText[5]; // 4 bits each + null terminator
-        strncpy(leftPlainText, plaintext, 4);
-        leftPlainText[4] = '\0'; // Null terminate
-        strncpy(rightPlainText, plaintext + 4, 4);
-        rightPlainText[4] = '\0'; // Null terminate
+    char leftPlainText[5], rightPlainText[5], tempPlainText[5]; // 4 bits each + null terminator
+    strncpy(leftPlainText, plaintext, 4);
+    leftPlainText[4] = '\0'; // Null terminate
+    strncpy(rightPlainText, plaintext + 4, 4);
+    rightPlainText[4] = '\0'; // Null terminate
 
-        printf("Left PlainText: %s\n", leftPlainText);
-        printf("Right PlainText: %s\n", rightPlainText);
-        
-        fk_block(leftPlainText, rightPlainText);
-    }
+    strcpy(leftPlainText, fk_block(leftPlainText, rightPlainText, KEY1));
+    
+    //SW block (Swap the left and right parts)
+    strcpy(tempPlainText, leftPlainText);
+    strcpy(leftPlainText, rightPlainText);
+    strcpy(rightPlainText, tempPlainText);
+
+    //2nd Fk function
+    strcpy(leftPlainText, fk_block(leftPlainText, rightPlainText, KEY2));
+    
+    //Combine the left and right parts
+    strcpy(plaintext, leftPlainText);
+    strcat(plaintext, rightPlainText);
+    plaintext[8] = '\0'; // Null terminate
+
+    //IP-1 block
+    strcpy(plaintext, ip1_block(plaintext)); // Inverse Initial Permutation (IP-1)
 
     return plaintext;
 }
@@ -193,7 +204,7 @@ char* p8_block(const char* left, const char* right) {
     return output;
 }
 
-char* fk_block(char* left, char* right) {
+char* fk_block(const char* left, const char* right, const char* key) {
     
     char rightPart[5];
     static char leftPart[5]; // 4 bits + null terminator -> output
@@ -212,7 +223,7 @@ char* fk_block(char* left, char* right) {
 
     //XOR with KEY1
     for (int i = 0; i < 9; i++) {
-        expandedRight[i] = XOR(expandedRight[i], KEY1[i]);
+        expandedRight[i] = XOR(expandedRight[i], key[i]);
     }
     expandedRight[8] = '\0'; // Null terminate
     
@@ -232,18 +243,13 @@ char* fk_block(char* left, char* right) {
     strcpy(P4_input, S0_output);
     strcat(P4_input, S1_output);
     P4_input[4] = '\0'; // Null terminate
-    printf("P4 input: %s\n", P4_input);
-    
     strcpy(temp, p4_block(P4_input));
-    printf("P4 output: %s\n", temp);
-    printf("Left Part before XOR: %s\n", leftPart);
     
     //XOR with left
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 4; i++) {
         leftPart[i] = XOR(leftPart[i], temp[i]);
     }
 
-    printf("Left Part after XOR: %s\n", leftPart);
     return leftPart;
 }
 
@@ -343,26 +349,17 @@ char* s1_block(const char* input) {
     return output;
 }
 
-//TODO: Fix this function to return correct P4 output
 char* p4_block(const char* input) {
     static char output[5]; // 4 bits + null terminator
     memset(output, 0, sizeof(output)); // Clear the output array
 
-    printf("P4 input inside p4_block: %s\n", input);
-
-    output[0] = input[2]; 
-    output[1] = input[4]; 
-    output[2] = input[3]; 
-    output[3] = input[1];
+    output[0] = input[1]; 
+    output[1] = input[3]; 
+    output[2] = input[2]; 
+    output[3] = input[0];
     output[4] = '\0'; // Null terminator 
 
-    printf("P4 output inside p4_block: %s\n", output);
-
     return output;
-}
-
-char OR(char a, char b) {
-    return (a == '1' || b == '1') ? '1' : '0';
 }
 
 char XOR(char a, char b) {

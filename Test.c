@@ -14,8 +14,14 @@ int main(){
     printf("Enter 3-digit hexadecimal key: ");
     scanf("%3s", key);
 
-    char* output = SDES(plaintext, key);
+    static char output[9]; // 8 bits + null terminator
+    strcpy(output, SDES(plaintext, key));
 
+    if (output != NULL) {
+        printf("Ciphertext (8-bit binary): %s\n", output);
+    } else {
+        fprintf(stderr, "Encryption failed due to input error.\n");
+    }
     
 
     return 0;

@@ -19,7 +19,7 @@ char* ls_block(char*, const int);
 
 char* p8_block(const char*, const char*);
 
-char* fk_block(char*, char*);
+char* fk_block(const char*, const char*, const char*);
 
 char* ip_block(const char*);
 
