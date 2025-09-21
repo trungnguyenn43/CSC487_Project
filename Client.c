@@ -15,7 +15,7 @@
 #include <sys/socket.h>
 #include <arpa/inet.h> // for inet_addr and sockaddr_in structs
 
-static char SERVER_ADDR[9] = "10.0.0.2"; // IP address of the server by default
+static char SERVER_ADDR[26] = "10.0.0.2"; // IP address of the server by default
 int SERVER_PORT = 49152;				 // Port number of the server by default
 
 int main(int argc, char *argv[])
@@ -27,9 +27,9 @@ int main(int argc, char *argv[])
 
 	if (strncmp(inputBuffer, "/", 1) != 0)
 	{
-		strncpy(SERVER_ADDR, inputBuffer, 9);
+		strncpy(SERVER_ADDR, inputBuffer, 16);
 	}
-
+	
 	printf("Enter server port number or '/' to use default (49152) >> ");
 	scanf("%s", inputBuffer);
 
