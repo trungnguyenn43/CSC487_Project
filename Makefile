@@ -1,9 +1,9 @@
 Sequence: SDES.o Server Client Test
 
 Server: Server.o 
-	g++ -o Server  Server.o 
+	g++ -o Server  Server.o SDES.o
 
-Server.o: Server.c
+Server.o: Server.c 
 	g++ -c -g -std=c++11 Server.c
 
 Client: Client.o
