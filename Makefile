@@ -1,4 +1,6 @@
-Sequence: SDES.o Server Client Test
+Sequence: SDES.o Server Client 
+
+Test: TestFile
 
 Server: Server.o 
 	g++ -o Server  Server.o SDES.o
@@ -12,14 +14,17 @@ Client: Client.o
 Client.o: Client.c
 	g++ -c -g -std=c++11 Client.c	
 
+TestFile: Test.o SDES.o
+	g++ -o Test Test.o SDES.o
+
+Test.o: Test.c
+	g++ -c -g -std=c++11 Test.c
+
 SDES.o: SDES.c SDES.h
 	g++ -c -g -std=c++11 SDES.h SDES.c 
 
-Test: Test.o SDES.o
-	g++ -o Test Test.o SDES.o
-
-Test.o: Test.c SDES.h
-	g++ -c -g -std=c++11 Test.c
-
 clean:
 	rm -f Server Client *.o
+
+cleanTest:
+	rm -f Test Test.o SDES.o
