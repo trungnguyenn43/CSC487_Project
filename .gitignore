@@ -56,3 +56,6 @@ dkms.conf
 
 /.vscode
 *.zip
+
+# Files with no extension
+*.
