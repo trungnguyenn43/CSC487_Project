@@ -55,3 +55,7 @@ dkms.conf
 *.dwo
 
 /.vscode
+*.zip
+
+# Binary files with no extensions
+*

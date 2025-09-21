@@ -9,4 +9,6 @@ RUN apt update \
     && apt -y install dos2unix \
     && apt -y install nano \
     && apt -y install vim \
+    && apt -y install net-tools \
+    && apt -y install iputils-ping \
     && apt clean

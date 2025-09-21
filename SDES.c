@@ -69,7 +69,7 @@ char* SDES(char* plaintextInput, char* keyInput) {
 
     //IP-1 block
     strcpy(plaintext, ip1_block(plaintext)); // Inverse Initial Permutation (IP-1)
-
+    
     return plaintext;
 }
 
