@@ -9,17 +9,17 @@
 #include <sys/socket.h>
 #include <arpa/inet.h> //inet_addr
 
-const int SERVER_PORT = 49512; // Port number of the server
+#include "SDES.h"
+
+// Define server port
+const int SERVER_PORT = 49152; // Port number of the server
 
 
 int main(int argc , char *argv[])
 {
 	int socket_desc , new_socket , c, read_size, i;
 	struct sockaddr_in server , client;
-	char *message, client_message[100];
-
-	char *list;	
-	list = "ls -l\n";
+	char* message, client_message[100];
 
 	//Create socket
 	socket_desc = socket(AF_INET , SOCK_STREAM , 0);
@@ -41,9 +41,8 @@ int main(int argc , char *argv[])
 	}
 
 	//Print server details
-	printf("INFO: Server IP: %s, Port: %d\n", inet_ntoa(server.sin_addr), ntohs(server.sin_port));
-	printf("INFO: Server listening on port %d\n", ntohs(server.sin_port));
 	printf("INFO: Socket bound, ready for and waiting on a client\n");
+	printf("INFO: Server IP: %s, Port: %d\n", inet_ntoa(server.sin_addr), ntohs(server.sin_port));
 	
 	//Listen
 	listen(socket_desc , 3);
@@ -69,24 +68,14 @@ int main(int argc , char *argv[])
 	{
 		printf("\nINFO: Client sent %2i byte message:  %.*s\n",read_size, read_size ,client_message);
 
-		if(!strncmp(client_message,"showMe",6)) 
-		{
-			printf("\nFiles in this directory: \n");
-			system(list);
-			printf("\n\n");
-		}
+		//Encrypt the message using SDES
+		// SDES(client_message, "3A7"); 
+		
 		//Send the message back to client
-		for(i=0;i< read_size;i++)
-		{
-			if ( i%2)
-				client_message[i] = 'z';
-		}
-
-            printf("INFO: Sending back Z'd up message:  %.*s \n", read_size ,client_message);
+		printf("INFO: Sending back ciphertext message:  %.*s \n", read_size ,client_message);
 
 		//write(new_socket, client_message , strlen(client_message));
 		write(new_socket, client_message , read_size);
-		
 		
 		if(read_size == 0)
 		{
@@ -103,3 +92,5 @@ int main(int argc , char *argv[])
 	close(socket_desc);
 	return 0;
 }
+
+

@@ -22,7 +22,6 @@ int main(){
     } else {
         fprintf(stderr, "Encryption failed due to input error.\n");
     }
-    
 
     return 0;
 }

@@ -33,7 +33,5 @@ char* s1_block(const char*);
 
 char* p4_block(const char*);
 
-char OR(char, char);
-
 char XOR(char, char);
 
