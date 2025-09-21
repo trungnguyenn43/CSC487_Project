@@ -1,8 +1,8 @@
 #pragma once
 
 //External global variables
-extern char plaintext[9]; // 8-bit binary string + null terminator \0
-extern char keytext[13];  // 12-bit key + null terminator. The first 2 bits are ignored
+// extern char plaintext[9]; // 8-bit binary string + null terminator \0
+// extern char keytext[13];  // 12-bit key + null terminator. The first 2 bits are ignored
 
 // Entry point
 char* SDES(char*, char*);

@@ -43,8 +43,8 @@ int main(int argc, char *argv[])
 				break;
 			}
 		}
-		
-		SERVER_PORT = atoi(inputBuffer); //to int
+
+		SERVER_PORT = atoi(inputBuffer); // to int
 	}
 
 	printf("Using server IP: %s, Port: %d\n", SERVER_ADDR, SERVER_PORT);
@@ -78,38 +78,58 @@ int main(int argc, char *argv[])
 
 	printf("Connected to server %s on port %d\n", SERVER_ADDR, SERVER_PORT);
 
-	char *plaintext, *key;
+	char plaintext[9], key[4]; // 8 bits + null terminator, 3 bits + null terminator
 
-	// //Get data from keyboard and send  to server
-	// printf("Plaintext in Hex >> \n");
-	// scanf("%s", &plaintext);
+	bool isExit = false;
 
-	// printf("Key in Hex (3 digits) >> \n");
-	// scanf("%s", &key);
+	while (!isExit)
+	{
+		// Get data from keyboard and send  to server
+		printf("Plaintext in Hex (2 digits) >> ");
+		scanf("%s", plaintext);
+		if(strlen(plaintext) != 2) {
+			printf("ERROR: Invalid plaintext input (code: 1)\n\n");
+			continue; // Skip to next iteration to wait for new input
+		}
 
-	// strcpy(client_message, plaintext);
-	// strcat(client_message, "\0");  // append '\0' to plaintext
-	// strcat(client_message, key);
+		printf("Key in Hex (3 digits) >> ");
+		scanf("%s", key);
+		if(strlen(key) != 3 || key[0] > '3') {
+			printf("ERROR: Invalid key input (code: 2)\n\n");
+			continue; // Skip to next iteration to wait for new input
+		}
 
-	// while(strncmp(client_message,"b",1))      // quit on "b" for "bye"
-	// {
-	// 	memset(client_mssage,'\0',100);
+		strcpy(client_message, plaintext);
+		strcat(client_message, " "); // append '\0' to plaintext
+		strcat(client_message, key);
 
-	// 	if( send(socket_desc , &client_message, strlen(client_message) , 0) < 0)
-	// 	{
-	// 		printf("Send failed");
-	// 		return 1;
-	// 	}
+		printf("Sending: %s\n", client_message);
 
-	// 	printf("\nSending Message: %.*s\n", (int) strlen(client_message),client_message);
+		if (send(socket_desc, &client_message, strlen(client_message), 0) < 0)
+		{
+			printf("Send failed");
+			return 1;
+		}
 
-	// 	//Receive a reply from the server
-	// 	if( (read_size = recv(socket_desc, server_reply , 100 , 0)) < 0)
-	// 	{
-	// 		printf("recv failed");
-	// 	}
-	// 	printf("Server  Replies: %.*s\n\n", read_size,server_reply);
-	// }
+		printf("\nSending Message: %.*s\n", (int)strlen(client_message), client_message);
+
+		// Receive a reply from the server
+		if ((read_size = recv(socket_desc, server_reply, 100, 0)) < 0)
+		{
+			printf("recv failed");
+		}
+		printf("Server Replies: %.*s\n\n", read_size, server_reply);
+		memset(client_message, '\0', 100);
+
+		printf("Continues? (y/n) >> ");
+		scanf("%s", inputBuffer);
+		if (strncmp(inputBuffer, "n", 1) == 0)
+		{	
+			isExit = true;
+		}
+	}
 
 	return 0;
 }
+
+
