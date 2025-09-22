@@ -2,6 +2,10 @@
 
 This document describes the error codes that may be encountered when using the Simplified Data Encryption Standard (SDES) implementation.
 
+## Input and Output of SDES
+input: 2  digits hex value for plaintext/ciphertext, 3 digits hex value for key
+output: 2 digits hex value for plaintext/ciphertext
+
 ## Error Codes
 
 - `CODE_1`: Empty input provided to the SDES function.
