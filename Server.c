@@ -12,8 +12,6 @@
 #include "SDES.h"
 
 // Function prototypes
-char *bin2Hex(const char *);
-char binDigits2Hex(const char *);
 char *inputSplit(const char *);
 
 // Define server port
@@ -114,64 +112,6 @@ int main(int argc, char *argv[])
 	// Free the socket pointer
 	close(socket_desc);
 	return 0;
-}
-
-char *bin2Hex(const char *bin)
-{
-	static char output[2];			   // Maximum 16 hex digits + null terminator
-	memset(output, 0, sizeof(output)); // Clear the output array
-
-	int len = strlen(bin);
-	if (len % 4 != 0)
-	{
-		printf("Error: Binary input length is not a multiple of 4 (code: 3)\n");
-		return NULL;
-	}
-	else
-	{
-		for (int i = 0; i < len; i += 4)
-		{
-			static char temp[5]; // 4 bits + null terminator
-			strncpy(temp, &bin[i], 4);
-			temp[4] = '\0'; // Null terminate
-
-			char hexDigit = binDigits2Hex(temp);
-			if (hexDigit == '\0')
-			{
-				return NULL;
-			}
-			strcat(output, &hexDigit);
-		}
-	}
-
-	return output;
-}
-
-char binDigits2Hex(const char *binary_str)
-{
-	char hex_digits[] = "0123456789ABCDEF";
-	int decimal_value = 0;
-
-	// Validate input length
-	if (strlen(binary_str) != 4)
-	{
-		return '\0';
-	}
-
-	// Convert 4-bit binary string to decimal
-	for (int i = 0; i < 4; i++)
-	{
-		if (binary_str[i] == '1')
-		{
-			decimal_value += (1 << (3 - i)); // (1 * 2^3) for first bit, (1 * 2^2) for second, etc.
-		}
-		else if (binary_str[i] != '0')
-		{
-			return '\0'; // Invalid character
-		}
-	}
-
-	return hex_digits[decimal_value];
 }
 
 char *inputSplit(const char *input)
