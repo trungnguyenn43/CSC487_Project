@@ -70,6 +70,9 @@ char* SDES(char* plainTextInput, char* keyInput) {
     //IP-1 block
     strcpy(textHolder, ip1_block(textHolder)); // Inverse Initial Permutation (IP-1)
     
+    //Convert to hex and return
+    strcpy(textHolder, bin2Hex(textHolder));
+
     return textHolder;
 }
 
@@ -126,6 +129,9 @@ char* SDES_decrypt(char* ciphertextInput, char* keyInput) {
 
     // IP-1 block
     strcpy(textHolder, ip1_block(textHolder));
+    
+    //Convert to hex and return
+    strcpy(textHolder, bin2Hex(textHolder));
 
     return textHolder;
 }
