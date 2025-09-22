@@ -138,7 +138,6 @@ char *bin2Hex(const char *bin)
 			char hexDigit = binDigits2Hex(temp);
 			if (hexDigit == '\0')
 			{
-				output[0] = '\0'; // Clear output on error
 				return NULL;
 			}
 			strcat(output, &hexDigit);

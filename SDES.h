@@ -4,12 +4,19 @@
 // extern char plaintext[9]; // 8-bit binary string + null terminator \0
 // extern char keytext[13];  // 12-bit key + null terminator. The first 2 bits are ignored
 
-// Entry point
+// Entry point for encryption
 char* SDES(char*, char*);
+
+// Entry point for decryption
+char* SDES_decrypt(char*, char*);
 
 char* hex2Bin(const char*);
 
+char binDigits2Hex(const char *);
+
 const char* hexDigitsToBin(const char);
+
+char *bin2Hex(const char *);
 
 void keyGen(const char*);
 
