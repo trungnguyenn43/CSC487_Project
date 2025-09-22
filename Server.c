@@ -84,15 +84,12 @@ int main(int argc, char *argv[])
 			// Encrypt the plaintext using SDES with the provided key
 			strcpy(client_message, SDES(plaintext, key));
 
-			// Convert binary ciphertext to hexadecimal
-			static char hexCiphertext[3]; // 2 hex digits
-			strcpy(hexCiphertext, bin2Hex(client_message));
 
 			// Send the message back to client
-			printf("INFO: Sending back ciphertext message:  %s \n", hexCiphertext);
+			printf("INFO: Sending back ciphertext message:  %s \n", client_message);
 
 			// write(new_socket, client_message , strlen(client_message));
-			write(new_socket, hexCiphertext, strlen(hexCiphertext));
+			write(new_socket, client_message, strlen(client_message));
 
 		}
 
