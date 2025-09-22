@@ -8,29 +8,29 @@
 
 //* Global Variables *//
 #pragma region global variables
-char plaintext[9] = ""; // 8-bit binary string + null terminator \0
+char textHolder[9] = ""; // 8-bit binary string + null terminator \0
 char keytext[13] = "";  // 12-bit key + null terminator. The first 2 bits are ignored
 char KEY1[9] = "";      // First 8-bit subkey + null terminator
 char KEY2[9] = "";      // Second 8-bit subkey + null terminator
 #pragma endregion
 
 
-//* Entry Point of the SDES algorithm *//
-char* SDES(char* plaintextInput, char* keyInput) {
+//* Entry Point of the SDES algorithm - encryption *//
+char* SDES(char* plainTextInput, char* keyInput) {
     // Validate inputs
-    if (plaintextInput == NULL || keyInput == NULL) {
+    if (plainTextInput == NULL || keyInput == NULL) {
         fprintf(stderr, "Error: Empty input (code: 1)\n");
         return NULL;
     }
 
     // Check if the first character of the keyInput is valid
     if (keyInput[0] != '0' && keyInput[0] != '1' && keyInput[0] != '2' && keyInput[0] != '3') {
-        fprintf(stderr, "Error: Invalid plaintext input (code: 2)\n");
+        fprintf(stderr, "Error: Invalid textHolder input (code: 2)\n");
         return NULL;
     }
 
-    {   // Convert plaintext and key from hex to binary
-        strcpy(plaintext, hex2Bin(plaintextInput)); // Convert plaintext
+    {   // Convert textHolder and key from hex to binary
+        strcpy(textHolder, hex2Bin(plainTextInput)); // Convert textHolder
         strcpy(keytext, hex2Bin(keyInput));         // Convert key
 
         // Ignore the first 2 bits of the key by left-shifting twice
@@ -43,34 +43,97 @@ char* SDES(char* plaintextInput, char* keyInput) {
     keyGen(keytext);
 
     //IP block
-    strcpy(plaintext, ip_block(plaintext)); // Initial Permutation (IP)
+    strcpy(textHolder, ip_block(textHolder)); // Initial Permutation (IP)
     
     //1st Fk function
-    char leftPlainText[5], rightPlainText[5], tempPlainText[5]; // 4 bits each + null terminator
-    strncpy(leftPlainText, plaintext, 4);
-    leftPlainText[4] = '\0'; // Null terminate
-    strncpy(rightPlainText, plaintext + 4, 4);
-    rightPlainText[4] = '\0'; // Null terminate
+    char lefttextHolder[5], righttextHolder[5], temptextHolder[5]; // 4 bits each + null terminator
+    strncpy(lefttextHolder, textHolder, 4);
+    lefttextHolder[4] = '\0'; // Null terminate
+    strncpy(righttextHolder, textHolder + 4, 4);
+    righttextHolder[4] = '\0'; // Null terminate
 
-    strcpy(leftPlainText, fk_block(leftPlainText, rightPlainText, KEY1));
+    strcpy(lefttextHolder, fk_block(lefttextHolder, righttextHolder, KEY1));
     
     //SW block (Swap the left and right parts)
-    strcpy(tempPlainText, leftPlainText);
-    strcpy(leftPlainText, rightPlainText);
-    strcpy(rightPlainText, tempPlainText);
+    strcpy(temptextHolder, lefttextHolder);
+    strcpy(lefttextHolder, righttextHolder);
+    strcpy(righttextHolder, temptextHolder);
 
     //2nd Fk function
-    strcpy(leftPlainText, fk_block(leftPlainText, rightPlainText, KEY2));
+    strcpy(lefttextHolder, fk_block(lefttextHolder, righttextHolder, KEY2));
     
     //Combine the left and right parts
-    strcpy(plaintext, leftPlainText);
-    strcat(plaintext, rightPlainText);
-    plaintext[8] = '\0'; // Null terminate
+    strcpy(textHolder, lefttextHolder);
+    strcat(textHolder, righttextHolder);
+    textHolder[8] = '\0'; // Null terminate
 
     //IP-1 block
-    strcpy(plaintext, ip1_block(plaintext)); // Inverse Initial Permutation (IP-1)
+    strcpy(textHolder, ip1_block(textHolder)); // Inverse Initial Permutation (IP-1)
     
-    return plaintext;
+    //Convert to hex and return
+    strcpy(textHolder, bin2Hex(textHolder));
+
+    return textHolder;
+}
+
+//* Entry Point of the SDES algorithm - decryption *//
+char* SDES_decrypt(char* ciphertextInput, char* keyInput) {
+    // Validate inputs
+    if (ciphertextInput == NULL || keyInput == NULL) {
+        fprintf(stderr, "Error: Empty input (code: 1)\n");
+        return NULL;
+    }
+
+    // Check if the first character of the keyInput is valid
+    if (keyInput[0] != '0' && keyInput[0] != '1' && keyInput[0] != '2' && keyInput[0] != '3') {
+        fprintf(stderr, "Error: Invalid ciphertext input (code: 2)\n");
+        return NULL;
+    }
+
+    // Convert ciphertext and key from hex to binary
+    strcpy(textHolder, hex2Bin(ciphertextInput)); // Convert ciphertext
+    strcpy(keytext, hex2Bin(keyInput));         // Convert key
+
+    // Ignore the first 2 bits of the key by left-shifting twice
+    strcpy(keytext, ls_block(keytext, 2));
+    keytext[strlen(keytext) - 1] = '\0'; // Null terminate after ignoring first 2 bits
+    keytext[strlen(keytext) - 1] = '\0'; // Ensure null termination
+
+    // Generate the two subkeys K1 and K2
+    keyGen(keytext);
+
+    // IP block
+    strcpy(textHolder, ip_block(textHolder)); // Initial Permutation (IP)
+
+    // 1st Fk function with KEY2
+    char lefttextHolder[5], righttextHolder[5], temptextHolder[5]; // 4 bits each + null terminator
+    strncpy(lefttextHolder, textHolder, 4);
+    lefttextHolder[4] = '\0'; // Null terminate
+    strncpy(righttextHolder, textHolder + 4, 4);
+    righttextHolder[4] = '\0'; // Null terminate
+
+    strcpy(lefttextHolder, fk_block(lefttextHolder, righttextHolder, KEY2));
+
+    // SW block (Swap the left and right parts)
+    strcpy(temptextHolder, lefttextHolder);
+    strcpy(lefttextHolder, righttextHolder);
+    strcpy(righttextHolder, temptextHolder);
+
+    // 2nd Fk function with KEY1
+    strcpy(lefttextHolder, fk_block(lefttextHolder, righttextHolder, KEY1));
+
+    // Combine the left and right parts
+    strcpy(textHolder, lefttextHolder);
+    strcat(textHolder, righttextHolder);
+    textHolder[8] = '\0'; // Null terminate
+
+    // IP-1 block
+    strcpy(textHolder, ip1_block(textHolder));
+    
+    //Convert to hex and return
+    strcpy(textHolder, bin2Hex(textHolder));
+
+    return textHolder;
 }
 
 //* Convert Hexadecimal to Binary *//
@@ -82,7 +145,6 @@ char* hex2Bin(const char* hex) {
     for (int i = 0; i < strlen(hex); i++) {
         const char* bin = hexDigitsToBin(hex[i]);
         if (bin == NULL || *bin == '\0') {
-            fprintf(stderr, "Error: Invalid hex digit '%c' (code: 2)\n", hex[i]);
             output[0] = '\0'; // Clear output on error
             return output;
         }
@@ -115,6 +177,64 @@ const char* hexDigitsToBin(const char hex) {
             fprintf(stderr, "Error: Invalid hex digit '%c' (code: 2)\n", hex);
             return NULL;
     }
+}
+
+char *bin2Hex(const char *bin)
+{
+	static char output[2];			   // Maximum 16 hex digits + null terminator
+	memset(output, 0, sizeof(output)); // Clear the output array
+
+	int len = strlen(bin);
+	if (len % 4 != 0)
+	{
+		printf("Error: Binary input length is not a multiple of 4 (code: 3)\n");
+		return NULL;
+	}
+	else
+	{
+		for (int i = 0; i < len; i += 4)
+		{
+			static char temp[5]; // 4 bits + null terminator
+			strncpy(temp, &bin[i], 4);
+			temp[4] = '\0'; // Null terminate
+
+			char hexDigit = binDigits2Hex(temp);
+			if (hexDigit == '\0')
+			{
+				return NULL;
+			}
+			strcat(output, &hexDigit);
+		}
+	}
+
+	return output;
+}
+
+char binDigits2Hex(const char *binary_str)
+{
+    char hex_digits[] = "0123456789ABCDEF";
+	int decimal_value = 0;
+
+	// Validate input length
+	if (strlen(binary_str) != 4)
+	{
+		return '\0';
+	}
+
+	// Convert 4-bit binary string to decimal
+	for (int i = 0; i < 4; i++)
+	{
+		if (binary_str[i] == '1')
+		{
+			decimal_value += (1 << (3 - i)); // (1 * 2^3) for first bit, (1 * 2^2) for second, etc.
+		}
+		else if (binary_str[i] != '0')
+		{
+			return '\0'; // Invalid character
+		}
+	}
+
+	return hex_digits[decimal_value];
 }
 
 //entry point for key generator
