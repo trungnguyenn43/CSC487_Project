@@ -1,10 +1,9 @@
-driver: DriverFile
 
-DriverFile: Driver.o SDES.o
-	g++ -o Driver Driver.o SDES.o
+bmper: bmper.o
+	g++ -o bmper bmper.o SDES.o
 
-Driver.o: Driver.c
-	g++ -c -g -std=c++11 Driver.c
+bmper.o: SDES.o bmper.c 
+	g++ -c -g -std=c++11 bmper.c
 
 Server: Server.o SDES.o
 	g++ -o Server Server.o SDES.o
@@ -23,4 +22,4 @@ SDES.o: SDES.c SDES.h
 	g++ -c -g -std=c++11 SDES.h SDES.c 
 
 clean:
-	rm -f Driver Server Client *.o
+	rm -f Server Client *.o
