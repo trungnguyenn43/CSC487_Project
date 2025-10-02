@@ -5,38 +5,33 @@
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <stdbool.h>
 
 //* Global Variables *//
 #pragma region global variables
 char textHolder[9] = ""; // 8-bit binary string + null terminator \0
-char keytext[13] = "";  // 12-bit key + null terminator. The first 2 bits are ignored
+char keytext[10] = "";  // 12-bit key + null terminator. The first 2 bits are ignored
 char KEY1[9] = "";      // First 8-bit subkey + null terminator
 char KEY2[9] = "";      // Second 8-bit subkey + null terminator
 #pragma endregion
 
 
-//* Entry Point of the SDES algorithm - encryption *//
-char* SDES(char* plainTextInput, char* keyInput) {
+//* Entry Point of the SDES algorithm - encryption *// 
+bool* SDES(const bool plainTextInput[8], const bool keyInput[10], bool outputBits[8]) {
     // Validate inputs
     if (plainTextInput == NULL || keyInput == NULL) {
         fprintf(stderr, "Error: Empty input (code: 1)\n");
         return NULL;
     }
-
-    // Check if the first character of the keyInput is valid
-    if (keyInput[0] != '0' && keyInput[0] != '1' && keyInput[0] != '2' && keyInput[0] != '3') {
-        fprintf(stderr, "Error: Invalid textHolder input (code: 2)\n");
-        return NULL;
+    
+    // Copy plainTextInput (bool array) to textHolder (char array)
+    for (int i = 0; i < 8; i++) {
+        textHolder[i] = plainTextInput[i] ? '1' : '0';
     }
-
-    {   // Convert textHolder and key from hex to binary
-        strcpy(textHolder, hex2Bin(plainTextInput)); // Convert textHolder
-        strcpy(keytext, hex2Bin(keyInput));         // Convert key
-
-        // Ignore the first 2 bits of the key by left-shifting twice
-        strcpy(keytext, ls_block(keytext, 2));
-        keytext[strlen(keytext) - 1] = '\0'; // Null terminate after ignoring first 2 bits
-        keytext[strlen(keytext) - 1] = '\0'; // Ensure null termination
+    
+    // Copy keyInput (bool array) to keytext (char array)
+    for (int i = 0; i < 10; i++) {
+        keytext[i] = keyInput[i] ? '1' : '0';
     }
 
     // Generate the two subkeys K1 and K2
@@ -70,34 +65,29 @@ char* SDES(char* plainTextInput, char* keyInput) {
     //IP-1 block
     strcpy(textHolder, ip1_block(textHolder)); // Inverse Initial Permutation (IP-1)
     
-    //Convert to hex and return
-    strcpy(textHolder, bin2Hex(textHolder));
+    for (int i = 0; i < 8; i++) {
+        outputBits[i] = (textHolder[i] == '1');
+    }
 
-    return textHolder;
+    return outputBits;
 }
 
 //* Entry Point of the SDES algorithm - decryption *//
-char* SDES_decrypt(char* ciphertextInput, char* keyInput) {
+bool* SDES_decrypt(const bool ciphertextInput[8], const bool keyInput[10], bool outputBits[8]) {
     // Validate inputs
     if (ciphertextInput == NULL || keyInput == NULL) {
         fprintf(stderr, "Error: Empty input (code: 1)\n");
         return NULL;
     }
 
-    // Check if the first character of the keyInput is valid
-    if (keyInput[0] != '0' && keyInput[0] != '1' && keyInput[0] != '2' && keyInput[0] != '3') {
-        fprintf(stderr, "Error: Invalid ciphertext input (code: 2)\n");
-        return NULL;
+    // Copy ciphertextInput (bool array) to textHolder (char array)
+    for (int i = 0; i < 8; i++) {
+        textHolder[i] = ciphertextInput[i] ? '1' : '0';
     }
-
-    // Convert ciphertext and key from hex to binary
-    strcpy(textHolder, hex2Bin(ciphertextInput)); // Convert ciphertext
-    strcpy(keytext, hex2Bin(keyInput));         // Convert key
-
-    // Ignore the first 2 bits of the key by left-shifting twice
-    strcpy(keytext, ls_block(keytext, 2));
-    keytext[strlen(keytext) - 1] = '\0'; // Null terminate after ignoring first 2 bits
-    keytext[strlen(keytext) - 1] = '\0'; // Ensure null termination
+    // Copy keyInput (bool array) to keytext (char array)
+    for (int i = 0; i < 10; i++) {
+        keytext[i] = keyInput[i] ? '1' : '0';
+    }
 
     // Generate the two subkeys K1 and K2
     keyGen(keytext);
@@ -130,10 +120,11 @@ char* SDES_decrypt(char* ciphertextInput, char* keyInput) {
     // IP-1 block
     strcpy(textHolder, ip1_block(textHolder));
     
-    //Convert to hex and return
-    strcpy(textHolder, bin2Hex(textHolder));
+    for (int i = 0; i < 8; i++) {
+        outputBits[i] = (textHolder[i] == '1');
+    }
 
-    return textHolder;
+    return outputBits;
 }
 
 //* Convert Hexadecimal to Binary *//
