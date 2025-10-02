@@ -57,5 +57,14 @@ dkms.conf
 /.vscode
 *.zip
 
-# Binary files with no extensions
-*
+# BMP files
+*.bmp
+
+!/Ver1
+
+*.o
+*.obj
+CSC487_README.md
+
+# Built binary files
+bmper
