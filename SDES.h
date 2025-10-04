@@ -7,13 +7,11 @@ bool* SDES(const bool[8], const bool[10], bool[8]);
 // Entry point for decryption
 bool* SDES_decrypt(const bool[8], const bool[10], bool[8]);
 
-char* hex2Bin(const char*);
+bool* hex2Bin(const char* , bool* );
 
-char binDigits2Hex(const char *);
+const char* hexDigitToBin(const char );
 
-const char* hexDigitsToBin(const char);
-
-char *bin2Hex(const char *);
+char bin2Hex(const bool bin[4]);
 
 void keyGen(const char*);
 

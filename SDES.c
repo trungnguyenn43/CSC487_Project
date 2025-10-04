@@ -36,7 +36,7 @@ bool* SDES(const bool plainTextInput[8], const bool keyInput[10], bool outputBit
 
     // Generate the two subkeys K1 and K2
     keyGen(keytext);
-
+    
     //IP block
     strcpy(textHolder, ip_block(textHolder)); // Initial Permutation (IP)
     
@@ -56,7 +56,8 @@ bool* SDES(const bool plainTextInput[8], const bool keyInput[10], bool outputBit
 
     //2nd Fk function
     strcpy(lefttextHolder, fk_block(lefttextHolder, righttextHolder, KEY2));
-    
+
+
     //Combine the left and right parts
     strcpy(textHolder, lefttextHolder);
     strcat(textHolder, righttextHolder);
@@ -64,6 +65,11 @@ bool* SDES(const bool plainTextInput[8], const bool keyInput[10], bool outputBit
 
     //IP-1 block
     strcpy(textHolder, ip1_block(textHolder)); // Inverse Initial Permutation (IP-1)
+    
+    // debug
+    printf("DEBUG: After IP-1 - Result: %s\n", textHolder);
+
+    // Convert the final binary string to boolean array
     
     for (int i = 0; i < 8; i++) {
         outputBits[i] = (textHolder[i] == '1');
@@ -128,24 +134,29 @@ bool* SDES_decrypt(const bool ciphertextInput[8], const bool keyInput[10], bool 
 }
 
 //* Convert Hexadecimal to Binary *//
-char* hex2Bin(const char* hex) {
-    static char output[65]; // Maximum 16 hex digits * 4 bits + null terminator
-    memset(output, 0, sizeof(output)); // Clear the output array
+//Input: Hex string
+//Output: Boolean array representing binary
+bool* hex2Bin(const char* hex, bool* output) {
+    // Validate inputs
+    if (hex == NULL || output == NULL) {
+        fprintf(stderr, "Error: Null input provided to hex2Bin (code: 4)\n");
+        return NULL;
+    }
 
     // Convert each hex digit to its 4-bit binary equivalent
     for (int i = 0; i < strlen(hex); i++) {
-        const char* bin = hexDigitsToBin(hex[i]);
-        if (bin == NULL || *bin == '\0') {
-            output[0] = '\0'; // Clear output on error
-            return output;
+        const char* bin = hexDigitToBin(hex[i]);
+        
+        // Copy the 4-bit binary representation to the output array
+        for (int j = 0; j < 4; j++) {
+            output[i * 4 + j] = (bin[j] == '1');
         }
-        strcat(output, bin); // Append binary representation
     }
 
     return output;
 }
 
-const char* hexDigitsToBin(const char hex) {
+const char* hexDigitToBin(const char hex) {
     // Return a static binary string for each hex digit
     switch (toupper(hex)) {
         case '0': return "0000";
@@ -170,62 +181,18 @@ const char* hexDigitsToBin(const char hex) {
     }
 }
 
-char *bin2Hex(const char *bin)
-{
-	static char output[2];			   // Maximum 16 hex digits + null terminator
-	memset(output, 0, sizeof(output)); // Clear the output array
+char bin2Hex(const bool bin[4]) {
+    int decimal_value = 0;
 
-	int len = strlen(bin);
-	if (len % 4 != 0)
-	{
-		printf("Error: Binary input length is not a multiple of 4 (code: 3)\n");
-		return NULL;
-	}
-	else
-	{
-		for (int i = 0; i < len; i += 4)
-		{
-			static char temp[5]; // 4 bits + null terminator
-			strncpy(temp, &bin[i], 4);
-			temp[4] = '\0'; // Null terminate
+    // Convert 4 bits to decimal
+    for (int i = 0; i < 4; i++) {
+        if (bin[i]) {
+            decimal_value += (1 << (3 - i)); // (1 * 2^3) for first bit, (1 * 2^2) for second, etc.
+        }
+    }
 
-			char hexDigit = binDigits2Hex(temp);
-			if (hexDigit == '\0')
-			{
-				return NULL;
-			}
-			strcat(output, &hexDigit);
-		}
-	}
-
-	return output;
-}
-
-char binDigits2Hex(const char *binary_str)
-{
-    char hex_digits[] = "0123456789ABCDEF";
-	int decimal_value = 0;
-
-	// Validate input length
-	if (strlen(binary_str) != 4)
-	{
-		return '\0';
-	}
-
-	// Convert 4-bit binary string to decimal
-	for (int i = 0; i < 4; i++)
-	{
-		if (binary_str[i] == '1')
-		{
-			decimal_value += (1 << (3 - i)); // (1 * 2^3) for first bit, (1 * 2^2) for second, etc.
-		}
-		else if (binary_str[i] != '0')
-		{
-			return '\0'; // Invalid character
-		}
-	}
-
-	return hex_digits[decimal_value];
+    // Convert decimal to hex and return the corresponding character
+    return "0123456789ABCDEF"[decimal_value];
 }
 
 //entry point for key generator
