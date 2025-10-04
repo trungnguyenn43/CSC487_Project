@@ -103,12 +103,6 @@ int main(int argc, char *argv[])
             }
         }
 
-        // Generate key iff new key is given
-        if (isKey)
-        {
-            // GenerateKeys(key);        // use your own, here or outside of this file
-        }
-
         bool temp[8] = {false};
         int counter = 0, step = 1;
         
@@ -434,5 +428,3 @@ void ReadInputArgs(char inFileStr[101], bool *isE, char outFileStr[101], bool ke
         sscanf(inLine, "%100s", outFileStr);
     }
 }
-
-
