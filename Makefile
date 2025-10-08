@@ -1,9 +1,9 @@
 
-bmper: bmper.o
-	g++ -o bmper bmper.o SDES.o
+driver: SDES.o driver.o 
+	g++ -o driver driver.o SDES.o
 
-bmper.o: SDES.o bmper.c 
-	g++ -c -g -std=c++11 bmper.c
+driver.o: driver.c
+	g++ -c -g -std=c++11 driver.c
 
 Server: Server.o SDES.o SDES.o DiffHellman.o
 	g++ -o Server Server.o SDES.o DiffHellman.o
@@ -11,8 +11,8 @@ Server: Server.o SDES.o SDES.o DiffHellman.o
 Server.o: Server.c 
 	g++ -c -g -std=c++11 Server.c
 
-Client: DiffHellman.o Client.o SDES.o DiffHellman.o
-	g++ -o Client Client.o DiffHellman.o
+Client: Client.o DiffHellman.o SDES.o 
+	g++ -o Client Client.o DiffHellman.o SDES.o
 
 Client.o: Client.c
 	g++ -c -g -std=c++11 Client.c	
