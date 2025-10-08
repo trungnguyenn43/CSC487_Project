@@ -1,11 +1,14 @@
 #pragma once
-#include <stdbool.h>
+
+//External global variables
+// extern char plaintext[9]; // 8-bit binary string + null terminator \0
+// extern char keytext[13];  // 12-bit key + null terminator. The first 2 bits are ignored
 
 // Entry point for encryption
-bool* SDES(const bool[8], const bool[10], bool[8]);
+void SDES(char [2], char [3], char [2]);
 
 // Entry point for decryption
-bool* SDES_decrypt(const bool[8], const bool[10], bool[8]);
+void SDES_decrypt(char [2], char [3], char [2]);
 
 char* hex2Bin(const char*);
 
