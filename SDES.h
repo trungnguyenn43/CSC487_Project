@@ -5,10 +5,10 @@
 // extern char keytext[13];  // 12-bit key + null terminator. The first 2 bits are ignored
 
 // Entry point for encryption
-char* SDES(char*, char*);
+void SDES(char [2], char [3], char [2]);
 
 // Entry point for decryption
-char* SDES_decrypt(char*, char*);
+void SDES_decrypt(char [2], char [3], char [2]);
 
 char* hex2Bin(const char*);
 
