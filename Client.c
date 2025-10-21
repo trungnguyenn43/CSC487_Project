@@ -13,6 +13,7 @@
 #include <ctype.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include <time.h>
 
 #include <sys/socket.h>
 #include <arpa/inet.h> // for inet_addr and sockaddr_in structs
@@ -29,6 +30,8 @@ void decipherMessage(char[4], char[100], const int, bool *);
 
 int main(int argc, char *argv[])
 {
+	srand(time(NULL)); 
+
 	// getting server address and port
 	char inputBuffer[100];
 	printf("Enter server IP address or type '/' to use default (10.0.0.2) >> ");
@@ -92,6 +95,7 @@ int main(int argc, char *argv[])
 	// Then generate shared key
 	int prime = -1;
 	int exp = -1;
+	int alpha = -1;
 	int shareKey = -1;
 	memset(server_reply, '\0', 100); // Clear the buffer
 	if ((read_size = recv(socket_desc, server_reply, 100, 0)) < 0)
@@ -100,25 +104,33 @@ int main(int argc, char *argv[])
 		close(socket_desc);
 		return 1;
 	}
-	else
-	{
-		memset(server_reply + read_size, '\0', 1); // Null terminate the string
-		int serverPublicKey;
-		sscanf(server_reply, "%d %d %d", &serverPublicKey, &prime, &exp); // Extract prime and exp from the received message
-		shareKey = DiffHellman_GenShareKey(serverPublicKey, exp, prime);
-
-		printf("INFO: Using prime number: %d\n", prime);
-		printf("INFO: Using private exponent: %d\n", exp);
-	}
-
+	
 	// Diff Hellman Key Exchange
-	int publicKey = DiffHellman_GenPublicKey(&exp, &prime);
+	memset(server_reply + read_size, '\0', 1); // Null terminate the string
+	int serverPublicKey;
+	sscanf(server_reply, "%d %d %d", &serverPublicKey, &prime, &alpha); // Extract prime and alpha from the received message
+	
+	printf("INFO: Server sent public key: %d\n", serverPublicKey);
+	printf("INFO: Using prime number: %d\n", prime);
+	printf("INFO: Using alpha: %d\n\n", alpha);
+
+	//Run inside client program instead
+	exp = rand() % (prime - 2) + 1; // Random integer in the range [1, prime-1]
+	printf("INFO: Using private exponent: %d\n", exp);
+
+
+	int publicKey = DiffHellman_GenPublicKey(&exp, &alpha, &prime);
 	if (publicKey == -1)
 	{
 		printf("ERROR: Unable to generate public key. Exiting...\n");
 		close(socket_desc);
 		return 1;
 	}
+	printf("INFO: Public key: %d\n\n", publicKey);
+
+	shareKey = DiffHellman_GenShareKey(serverPublicKey, exp, prime);
+
+
 
 	memset(client_message, '\0', 100);		  // Clear the buffer
 	sprintf(client_message, "%d", publicKey); // Convert int to string
@@ -134,8 +146,8 @@ int main(int argc, char *argv[])
 	// End of Diff Hellman Key Exchange
 
 	char plaintext[9], key[4]; // 8 bits + null terminator, 3 bits + null terminator
-	corectKeyLength(shareKey, key);
 	printf("INFO: Shared key: %d\n", shareKey);
+	corectKeyLength(shareKey, key);
 	printf("INFO: Using SDES with shared key: %s\n", key);
 
 	bool isExit = false;

@@ -9,10 +9,9 @@
 #include <math.h>
 #include <time.h>
 
-int DiffHellman_GenPublicKey(int *exp, int *prime)
-{
-
-    srand(time(0));
+int DiffHellman_GenPublicKey(int *exp, int* alpha, int *prime)
+{   
+    srand(time(NULL)); // Seed the random number generator
 
     *prime = getRandomPrime();
     if (*prime == -1)
@@ -20,13 +19,16 @@ int DiffHellman_GenPublicKey(int *exp, int *prime)
         return -1; // Exit if there was an error getting a prime
     }
 
-    // Random integer in the range [1, prime-1]
-    *exp = rand() % (*prime - 2) + 1;
+    if(*exp == -1){
+        // Random integer in the range [1, prime-1]
+        *exp = rand() % (*prime - 2) + 1;
+    }
+    
+    if(*alpha == -1){
+        *alpha = primitiveRoot(*prime);
+    }
 
-    int alpha = primitiveRoot(*prime);
-    printf("INFO: Using alpha: %d\n", alpha);
-
-    int publicKey = modExp(alpha, *exp, *prime);
+    int publicKey = modExp(*alpha, *exp, *prime);
 
     return publicKey;
 }

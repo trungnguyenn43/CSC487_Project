@@ -21,7 +21,7 @@ void messageClient(char[4], char[100], bool *);
 const int SERVER_PORT = 49152; // Port number of the server
 
 int main(int argc, char *argv[])
-{
+{	
 	int socket_desc, new_socket, c, read_size, i;
 	struct sockaddr_in server, client;
 	char client_message[100];
@@ -72,7 +72,8 @@ int main(int argc, char *argv[])
 	// generate and display public key
 	int prime = -1;
 	int exp = -1;
-	int publicKey = DiffHellman_GenPublicKey(&exp, &prime);
+	int alpha = -1;
+	int publicKey = DiffHellman_GenPublicKey(&exp, &alpha, &prime);
 	int shareKey = -1;
 	if (publicKey == -1)
 	{
@@ -80,12 +81,13 @@ int main(int argc, char *argv[])
 		close(new_socket);
 		return 1;
 	}
-	printf("INFO: Using prime number: %d\n", prime);
+    printf("INFO: Using alpha: %d\n", alpha);
 	printf("INFO: Using private exponent: %d\n", exp);
-	printf("INFO: Public key: %d\n", publicKey);
+	printf("INFO: Using prime number: %d\n", prime);
+	printf("INFO: Public key: %d\n\n", publicKey);
 
 	// send the public key to client
-	sprintf(client_message, "%d %d %d", publicKey, prime, exp);
+	sprintf(client_message, "%d %d %d", publicKey, prime, alpha);
 	write(new_socket, client_message, strlen(client_message));
 
 	// wait for client to send its public key
