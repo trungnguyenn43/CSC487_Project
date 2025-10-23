@@ -1,9 +1,9 @@
 
-driver: SDES.o driver.o 
-	g++ -o driver driver.o SDES.o
+CBCHash: CBCHash.o SDES.o
+	g++ -o CBCHash CBCHash.o SDES.o
 
-driver.o: driver.c
-	g++ -c -g -std=c++11 driver.c
+CBCHash.o: CBCHash.c
+	g++ -c -g -std=c++11 CBCHash.c
 
 Server: Server.o SDES.o SDES.o DiffHellman.o
 	g++ -o Server Server.o SDES.o DiffHellman.o
