@@ -1,6 +1,6 @@
 
-Driver: Driver.o UtilFunction.o
-	g++ -o Driver Driver.o UtilFunction.o
+Driver: Driver.o UtilFunction.o DiffHellman.o
+	g++ -o Driver Driver.o UtilFunction.o DiffHellman.o
 
 Driver.o: Driver.c
 	g++ -c -g -std=c++11 Driver.c
