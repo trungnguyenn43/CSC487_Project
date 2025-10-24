@@ -1,4 +1,13 @@
 
+Driver: Driver.o UtilFunction.o
+	g++ -o Driver Driver.o UtilFunction.o
+
+Driver.o: Driver.c
+	g++ -c -g -std=c++11 Driver.c
+
+UtilFunction.o: UtilFunction.c UtilFunction.h
+	g++ -c -g -std=c++11 UtilFunction.c UtilFunction.h
+
 CBCHash: CBCHash.o SDES.o
 	g++ -o CBCHash CBCHash.o SDES.o
 
