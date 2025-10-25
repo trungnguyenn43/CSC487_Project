@@ -7,7 +7,7 @@
 
 #include <stdlib.h>
 #include <math.h>
-#include <time.h>
+#include <ctime>
 
 int DiffHellman_GenPublicKey(int *exp, int* alpha, int *prime)
 {   
@@ -36,7 +36,8 @@ int DiffHellman_GenShareKey(const int alpha, const int exp, const int prime)
 
 // getting the random prime and primitive root
 void getRandomPrime(int *prime, int *primitiveRoot)
-{   
+{      
+    srand(time(NULL));
     FILE *file;
     file = fopen("primes.txt", "r");
 
@@ -75,6 +76,9 @@ void getRandomPrime(int *prime, int *primitiveRoot)
     return;
 }
 
+// FMEA - Fast Modular Exponentiation
+// Input: base, exponent, mod
+// Output: (base^exponent) % mod
 int modExp(int base, int exp, const int mod)
 {
 
@@ -108,16 +112,4 @@ int modExp(int base, int exp, const int mod)
     }
 
     return result;
-}
-
-
-int gcd(int a, int b)
-{
-    while (b != 0)
-    {
-        int temp = b;
-        b = a % b;
-        a = temp;
-    }
-    return a;
 }
