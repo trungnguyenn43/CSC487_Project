@@ -1,9 +1,18 @@
 
-driver: SDES.o driver.o 
-	g++ -o driver driver.o SDES.o
+Driver: Driver.o UtilFunction.o DiffHellman.o SDES.o
+	g++ -o Driver Driver.o UtilFunction.o DiffHellman.o SDES.o
 
-driver.o: driver.c
-	g++ -c -g -std=c++11 driver.c
+Driver.o: Driver.c
+	g++ -c -g -std=c++11 Driver.c
+
+CBCHash: CBCHash.o UtilFunction.o SDES.o
+	g++ -o CBCHash CBCHash.o UtilFunction.o SDES.o
+
+CBCHash.o: CBCHash.c 
+	g++ -c -g -std=c++11 CBCHash.c
+
+UtilFunction.o: UtilFunction.c UtilFunction.h 
+	g++ -c -g -std=c++11 UtilFunction.c UtilFunction.h 
 
 Server: Server.o SDES.o SDES.o DiffHellman.o
 	g++ -o Server Server.o SDES.o DiffHellman.o
