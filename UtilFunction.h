@@ -2,8 +2,10 @@
 #pragma once
 
 // Project 2C
-unsigned int RSA_KeyGen(unsigned int , unsigned int, unsigned int* );
-unsigned int selectE(unsigned int, unsigned int );
+unsigned int RSA_KeyGen(unsigned int , unsigned int , unsigned int* );
+unsigned int totientMultiplcativeInverse(unsigned int , unsigned int, unsigned int* );
+unsigned int selectE_RSA(unsigned int);
+unsigned int selectE_2Primes(unsigned int, unsigned int );
 
 unsigned int multiplicativeInverse(unsigned int , unsigned int );
 unsigned int extendedEuclidean(unsigned int , unsigned int , int* ,  int* );
