@@ -28,7 +28,7 @@ int main(){
 
     unsigned int totient_n = (p - 1) * (q - 1);
 
-    unsigned int e = 7;
+    unsigned int e = 0;
     unsigned int d = RSA_KeyGen(p, q, &e);
     printf("Your q: %u, p: %u, n: %u\n", p, q, n);
     printf("Totient(n): %u\n", totient_n);
@@ -41,15 +41,15 @@ int main(){
 
         int mode = -1;
         printf("Select mode:\n");
-        printf("0: Exit\n");
         printf("1: RSA Encrypt  message\n");
         printf("2. RSA Descrypt  Message\n");
+        printf("3: Exit\n");
         printf(">> ");
         scanf("%d", &mode);
 
-        if(mode == 0){
+        if(mode == 3){
             break;
-        } else if(mode > 2 || mode < 0){
+        } else if(mode > 1 || mode < 2){
             printf("Invalid mode. Please enter again.\n");
             continue;
         }

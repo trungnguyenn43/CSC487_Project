@@ -8,15 +8,57 @@
 #include "SDES.h"
 
 // =============================================================
-// Project 2C: Two Prime Multiplicative Inverse Calculation (RSA Key Generation)
+// Project 2D: RSA Key Generation
+// =============================================================
+// Input: two prime numbers p and q, eOut (if = 0, create new e)
+// output: d - multiplicative inverse of e mod totient, where totient = (p-1)*(q-1)
+unsigned int RSA_KeyGen(unsigned int p, unsigned int q, unsigned int* eOut){
+
+    
+    if(*eOut == 0){
+        printf("eOut is not provided. Selecting a new e\n");
+        *eOut = selectE_RSA((q-1) * (p-1));
+        printf("Chosen e: %u\n", *eOut);
+    }
+
+    return multiplicativeInverse((p - 1) * (q - 1), *eOut);
+    
+}
+
+unsigned int selectE_RSA(unsigned int totient){
+
+    srand(time(NULL));
+
+    unsigned int e = 2;
+    unsigned int eList[25]; //possible e values
+    int eCount = 0; // count of eList elements
+
+    // Find e such that gcd(e, totient) = 1
+    while(e < totient && eCount < 25){
+        if(gcd(e, totient) == 1){
+            eList[eCount] = e;
+            eCount++;
+        }
+        e++;
+    }
+
+    // Randomly select e from the list
+    int randomIndex = rand() % eCount;
+    e = eList[randomIndex];
+
+    return e;
+}
+
+// =============================================================
+// Project 2C: Totient Multiplicative Inverse Calculation
 // =============================================================
 // Input: two prime numbers p and q, eOut (if = 0, create new e)
 // output: multiplicative inverse of e mod totient, where totient = (p-1)*(q-1)
-unsigned int RSA_KeyGen(unsigned int p, unsigned int q, unsigned int* eOut){
+unsigned int totientMultiplcativeInverse(unsigned int p, unsigned int q, unsigned int* eOut){
 
     if(*eOut == 0){
         printf("eOut is not provided. Selecting a new e\n");
-        *eOut = selectE(q, p);
+        *eOut = selectE_2Primes(q, p);
         printf("Chosen e: %u\n", *eOut);
     }
     
@@ -24,11 +66,12 @@ unsigned int RSA_KeyGen(unsigned int p, unsigned int q, unsigned int* eOut){
     
 }
 
-unsigned int selectE(unsigned int q, unsigned int p){
+
+unsigned int selectE_2Primes(unsigned int q, unsigned int p){
 
     srand(time(NULL));
 
-    unsigned int e = 3;
+    unsigned int e = 2;
     unsigned int eList[25]; //possible e values
     int eCount = 0; // count of eList elements
 
@@ -38,7 +81,7 @@ unsigned int selectE(unsigned int q, unsigned int p){
             eList[eCount] = e;
             eCount++;
         }
-        e += 2; // only odd numbers
+        e++;
     }
 
     // Randomly select e from the list
@@ -113,7 +156,6 @@ unsigned int gcd(unsigned int a, unsigned int b)
     }
     return a;
 }
-
 
 // =============================================================
 // Project 2B: CBC Hash Function Implementation
