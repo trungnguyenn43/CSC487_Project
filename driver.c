@@ -49,7 +49,7 @@ int main(){
 
         if(mode == 3){
             break;
-        } else if(mode > 1 || mode < 2){
+        } else if(mode < 1 || mode > 2){
             printf("Invalid mode. Please enter again.\n");
             continue;
         }
