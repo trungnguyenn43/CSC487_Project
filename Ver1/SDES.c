@@ -16,10 +16,20 @@ char KEY2[9] = "";      // Second 8-bit subkey + null terminator
 
 
 //* Entry Point of the SDES algorithm - encryption *//
+// Input: 2 hex digits plaintext and 3 hex digits key as strings
+// Output: 2 hex digits ciphertext as string
 char* SDES(char* plainTextInput, char* keyInput) {
     // Validate inputs
     if (plainTextInput == NULL || keyInput == NULL) {
         fprintf(stderr, "Error: Empty input (code: 1)\n");
+        return NULL;
+    }
+    else if (strlen(plainTextInput) != 2) {
+        fprintf(stderr, "Error: Invalid plaintext input length (code: 3)\n");
+        return NULL;
+    }
+    else if (strlen(keyInput) != 3) {
+        fprintf(stderr, "Error: Invalid key input length (code: 3)\n");
         return NULL;
     }
 
@@ -80,17 +90,29 @@ char* SDES(char* plainTextInput, char* keyInput) {
 }
 
 //* Entry Point of the SDES algorithm - decryption *//
+// Input: 2 hex digits ciphertext and 3 hex digits key as strings
+// Output: 2 hex digits plaintext as string
 char* SDES_decrypt(char* ciphertextInput, char* keyInput) {
     // Validate inputs
     if (ciphertextInput == NULL || keyInput == NULL) {
         fprintf(stderr, "Error: Empty input (code: 1)\n");
         return NULL;
     }
-
-    // Check if the first character of the keyInput is valid
-    if (keyInput[0] != '0' && keyInput[0] != '1' && keyInput[0] != '2' && keyInput[0] != '3') {
-        fprintf(stderr, "Error: Invalid ciphertext input (code: 2)\n");
+    else if (strlen(ciphertextInput) != 2) {
+        fprintf(stderr, "Error: Invalid plaintext input length (code: 3)\n");
         return NULL;
+    }
+    else if (strlen(keyInput) != 3) {
+        fprintf(stderr, "Error: Invalid key input length (code: 3)\n");
+        return NULL;
+    }
+
+    // Check if the characters of the keyInput is valid hex digits
+    for(int i = 0; i < strlen(keyInput); i++) {
+        if (!isxdigit(keyInput[i])) {
+            fprintf(stderr, "Error: Invalid key input (code: 2)\n");
+            return NULL;
+        }
     }
 
     // Convert ciphertext and key from hex to binary
