@@ -157,6 +157,24 @@ unsigned int gcd(unsigned int a, unsigned int b)
     return a;
 }
 
+bool isPrime(unsigned int num){
+    //common cases
+    if(num <= 1) return false; //must be greater than 1
+
+    if(num <= 3) return true; // 2 and 3 are prime
+
+    if(num % 2 == 0) return false; //divisible by 2, is not prime
+
+    unsigned int current = 3;
+    while(current < num){
+        //if divisible with another number, not prime
+        if(num % current == 0) return false;
+        current += 2; // check only odd at after 3
+    }
+
+    return true;
+}
+
 // =============================================================
 // Project 2B: CBC Hash Function Implementation
 // =============================================================

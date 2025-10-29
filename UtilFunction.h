@@ -11,6 +11,7 @@ unsigned int multiplicativeInverse(unsigned int , unsigned int );
 unsigned int extendedEuclidean(unsigned int , unsigned int , int* ,  int* );
 
 unsigned int gcd(unsigned int , unsigned int );
+bool isPrime(unsigned int );
 
 // Project 2B
 void CBCHash(const char* , const char [2], char [3] , char [2]);
