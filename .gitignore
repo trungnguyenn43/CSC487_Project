@@ -59,14 +59,12 @@ dkms.conf
 
 # BMP files
 *.bmp
-*.o
-*.obj
 CSC487_README.md
 
 # Built binary files
 bmper
 
-/Ver1/
-/Ver1
-
 /Project 1B/
+
+/Server-Client DiffHellman/
+/Output/
