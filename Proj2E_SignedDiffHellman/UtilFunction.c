@@ -16,7 +16,6 @@ unsigned int RSA_KeyGen(unsigned int p, unsigned int q, unsigned int* eOut){
 
     
     if(*eOut == 0){
-        printf("eOut is not provided. Selecting a new e\n");
         *eOut = selectE_RSA((q-1) * (p-1));
         printf("Chosen e: %u\n", *eOut);
     }
