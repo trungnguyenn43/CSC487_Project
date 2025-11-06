@@ -19,7 +19,7 @@ int DiffHellman_GenPublicKey(int *exp, int* alpha, int *prime)
         return -1; // Error in getting prime and primitive root
     }
 
-    if(*exp == -1){
+    if(*exp == 0){
         // Random integer in the range [1, prime-1]
         *exp = rand() % (*prime - 2) + 1;
     }
