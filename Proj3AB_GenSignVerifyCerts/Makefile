@@ -5,8 +5,8 @@ Driver: Driver.o UtilFunction.o DiffHellman.o SDES.o Certs.o
 Driver.o: Driver.c
 	g++ -c -g -std=c++11 Driver.c
 
-Certs.o: Certs.c Certs.h UtilFunction.h DiffHellman.h SDES.h
-	g++ -c -g -std=c++11 Certs.c Certs.h UtilFunction.h DiffHellman.h SDES.h
+Certs.o: Certs.c Certs.h 
+	g++ -c -g -std=c++11 Certs.c Certs.h
 
 UtilFunction.o: UtilFunction.c UtilFunction.h 
 	g++ -c -g -std=c++11 UtilFunction.c UtilFunction.h
