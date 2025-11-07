@@ -51,11 +51,23 @@ int main() {
     fclose(crlFile);
 
     char* certList[100];
-
+    
     char fileName[100] = "";
     crlInfo crlFileInfo;
     crlEntry crlEntries[100];
-    strcpy(crlFileInfo.crlFileName, CRL_FILE_NAME);
+
+    printf("Enter CRL file name or press enter to use default (default: crl_list.txt): ");
+    fgets(fileName, sizeof(fileName), stdin);
+    // remove newline character from fgets
+    fileName[strcspn(fileName, "\n")] = 0;
+    if(strlen(fileName) == 0){
+        printf("Using default CRL file name: %s\n", CRL_FILE_NAME);
+        strcpy(crlFileInfo.crlFileName, CRL_FILE_NAME);
+    }
+    else{
+        printf("Using CRL file name: %s\n", fileName);
+        strcpy(crlFileInfo.crlFileName, fileName);
+    }
     if(loadCRLEntry(&crlFileInfo, crlEntries, d, e, n) != 1){
         printf("Load CRL entries failed. Exitting program!\n");
         return -1;
@@ -69,8 +81,10 @@ int main() {
         printf("1. Generate Certificate\n");
         printf("2. Verify Certificate\n");
         printf("3. Add revoked cert\n");
-        printf("4. Show CRL List\n");
-        printf("5. Exit\n");
+        printf("4. Remove revoked cert\n");
+        printf("5. Show CRL List\n");
+        printf("6. New CRL File\n");
+        printf("7. Exit\n");
         printf("Enter choice >> ");
         fgets(inputBuffer, sizeof(inputBuffer), stdin);
         choice = atoi(inputBuffer);
@@ -86,8 +100,17 @@ int main() {
                 addCRLEntry(crlEntries, &crlFileInfo.numEntries);
                 break;
             case 4:
+                printf("Enter Certificate Serial Number to remove from CRL: ");
+                fgets(inputBuffer, sizeof(inputBuffer), stdin);
+                // remove newline character from fgets
+                inputBuffer[strcspn(inputBuffer, "\n")] = 0;
+                rmCRLEntry(crlEntries, &crlFileInfo.numEntries, inputBuffer);
+                break;
+            case 5:
                 if(crlFileInfo.numEntries == 0){
-                    printf("CRL list is empty.\n\n");
+                    printf("CRL list is empty.\n");
+                    printf("===========================================\n\n");
+
                     break;
                 }
                 printf("============== CRL ENTRY ===================\n");
@@ -97,7 +120,19 @@ int main() {
                 }
                 printf("===========================================\n\n");
                 break;
-            case 5:
+            
+            case 6:
+                printf("Enter new CRL file name: ");
+                fgets(fileName, sizeof(fileName), stdin);
+                // remove newline character from fgets
+                fileName[strcspn(fileName, "\n")] = 0;
+                strcpy(crlFileInfo.crlFileName, fileName);
+                crlFileInfo.numEntries = 0; // reset number of entries
+                printf("New CRL file set to: %s\n", crlFileInfo.crlFileName);
+                newCRLFile(crlFileInfo.crlFileName, d, e, n);
+                break;
+            
+            case 7:
                 printf("Exiting program.\n");
                 saveCRL(&crlFileInfo, crlEntries, d, e, n);
                 return 0;

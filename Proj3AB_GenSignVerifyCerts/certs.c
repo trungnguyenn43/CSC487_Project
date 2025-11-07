@@ -324,6 +324,36 @@ void addCRLEntry(crlEntry entryList[], int *numEntries)
     printf("=================================\n\n");
 }
 
+void rmCRLEntry(crlEntry entryList[], int *numEntries, const char serialNumber[])
+{
+    int foundIndex = -1;
+    for (int i = 0; i < *numEntries; i++)
+    {
+        if (strcmp(entryList[i].serialNumber, serialNumber) == 0)
+        {
+            foundIndex = i;
+            break;
+        }
+    }
+
+    if (foundIndex != -1)
+    {
+        // Shift entries to remove the found entry
+        for (int i = foundIndex; i < *numEntries - 1; i++)
+        {
+            entryList[i] = entryList[i + 1];
+        }
+        (*numEntries)--;
+        printf("Certificate with Serial Number %s removed from CRL.\n", serialNumber);
+    }
+    else
+    {
+        printf("Certificate with Serial Number %s not found in CRL.\n", serialNumber);
+    }
+
+    printf("=================================\n\n");
+}
+
 int loadCRLEntry(crlInfo *crlFileInfo, crlEntry entryList[], unsigned int privateKey, unsigned int publicKey, unsigned int n)
 {   
     // file name check

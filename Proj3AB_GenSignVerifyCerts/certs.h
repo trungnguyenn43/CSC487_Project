@@ -37,4 +37,6 @@ void saveCRL(crlInfo* ,crlEntry [], unsigned int , unsigned int , unsigned int )
 
 void addCRLEntry(crlEntry [], int *);
 
+void rmCRLEntry(crlEntry [], int *, const char []);
+
 crlInfo newCRLFile(char [], unsigned int , unsigned int , unsigned int );
