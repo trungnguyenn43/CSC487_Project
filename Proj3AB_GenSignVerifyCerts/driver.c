@@ -5,6 +5,8 @@
 #include "DiffHellman.h"
 #include "certs.h"
 
+const char CRL_FILE_NAME[] = "crl_list.txt";
+
 int main() {
     
     unsigned int p, q;
@@ -38,6 +40,26 @@ int main() {
         continue;
         
     }while(1);
+
+    // Project 3B: CRL
+    FILE *crlFile = fopen(CRL_FILE_NAME, "a+");
+    if (crlFile == NULL)
+    {
+        printf("Error opening CRL file.\n");
+        return -1;
+    }
+    fclose(crlFile);
+
+    char* certList[100];
+
+    char fileName[100] = "";
+    crlInfo crlFileInfo;
+    crlEntry crlEntries[100];
+    strcpy(crlFileInfo.crlFileName, CRL_FILE_NAME);
+    if(loadCRLEntry(&crlFileInfo, crlEntries, d, e, n) != 1){
+        printf("Load CRL entries failed. Exitting program!\n");
+        return -1;
+    }
     
     do{
         // create menu
@@ -46,7 +68,9 @@ int main() {
         printf("Please select an option:\n");
         printf("1. Generate Certificate\n");
         printf("2. Verify Certificate\n");
-        printf("3. Exit\n");
+        printf("3. Add revoked cert\n");
+        printf("4. Show CRL List\n");
+        printf("5. Exit\n");
         printf("Enter choice >> ");
         fgets(inputBuffer, sizeof(inputBuffer), stdin);
         choice = atoi(inputBuffer);
@@ -56,10 +80,26 @@ int main() {
                 certGen(d, e, n); // pass private, public key, and n
                 break;
             case 2:
-                certVerify();
+                certVerify(crlEntries, crlFileInfo.numEntries);
                 break;
             case 3:
+                addCRLEntry(crlEntries, &crlFileInfo.numEntries);
+                break;
+            case 4:
+                if(crlFileInfo.numEntries == 0){
+                    printf("CRL list is empty.\n\n");
+                    break;
+                }
+                printf("============== CRL ENTRY ===================\n");
+                printf("Total revoked certificates: %d\n", crlFileInfo.numEntries);
+                for(int i = 0; i < crlFileInfo.numEntries; i++){
+                    printf("%4d. Serial Number: %s, Revocation Date: %s", i, crlEntries[i].serialNumber, ctime(&crlEntries[i].revocationDate));
+                }
+                printf("===========================================\n\n");
+                break;
+            case 5:
                 printf("Exiting program.\n");
+                saveCRL(&crlFileInfo, crlEntries, d, e, n);
                 return 0;
             default:
                 break;
