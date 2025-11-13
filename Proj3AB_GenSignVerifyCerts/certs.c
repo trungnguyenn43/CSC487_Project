@@ -107,7 +107,6 @@ void certGen(unsigned int privateKey, unsigned int publicKey, unsigned int n)
 
 int certVerify(const crlEntry entryList[], int numEntries)
 {   
-    int returnCode = 1;
     char inputBuffer[256];
     char fileName[256];
     char valueString[1024]; // string temp to hold all cert values for signing
@@ -127,8 +126,7 @@ int certVerify(const crlEntry entryList[], int numEntries)
 
     if(verifyFileSignature(fileName) != 1){
         printf("=================================\n\n");
-        returnCode = -1;
-        return returnCode;
+        return -1;
     };
 
     FILE *certFile = fopen(inputBuffer, "r");
@@ -136,8 +134,7 @@ int certVerify(const crlEntry entryList[], int numEntries)
     {
         printf("Error opening certificate file for reading.\n");
         fclose(certFile);
-        returnCode = -1;
-        return returnCode;
+        return -1;
     }
     fseek(certFile, 0, SEEK_SET); // move pointer to beginning of file
 
@@ -156,7 +153,9 @@ int certVerify(const crlEntry entryList[], int numEntries)
             for(int i = 0; i < numEntries; i++){
                 if(strcmp(serialNumber, entryList[i].serialNumber) == 0){
                     printf("Certificate with Serial Number %s is revoked.\n", serialNumber);
-                    returnCode = 0;
+                    printf("=================================\n\n");
+                    fclose(certFile);
+                    return 0;
                 }
             }
             
@@ -195,7 +194,7 @@ int certVerify(const crlEntry entryList[], int numEntries)
     printf("=================================\n\n");
     
     fclose(certFile);
-    return returnCode;
+    return 1;
 }
 
 void signFile(char fileName[], unsigned int privateKey, unsigned int publicKey, unsigned int n){
@@ -220,7 +219,7 @@ void signFile(char fileName[], unsigned int privateKey, unsigned int publicKey, 
     memset(fileContent, '\0', sizeof(fileContent));
 
     while(fgets(inputBuffer, sizeof(inputBuffer), certFile) != NULL)
-    {
+    {   
         strcat(fileContent, inputBuffer);
     }
     
@@ -266,7 +265,7 @@ int verifyFileSignature(char fileName[]){
     fseek(certFile, 0, SEEK_SET); // move pointer to beginning of file
 
     while(fgets(inputBuffer, sizeof(inputBuffer), certFile) != NULL)
-    {   
+    {      
         if(strncmp(inputBuffer, "Signature:", 10) == 0)
         {
             // extract signature
@@ -480,14 +479,18 @@ crlInfo newCRLFile(char crlFileName[], unsigned int privateKey, unsigned int pub
     printf("Enter Algorithm for CRL: ");
     fgets(inputBuffer, sizeof(inputBuffer), stdin);
     fprintf(crlFile, "Algorithm: %s", inputBuffer);
+    strcpy(newCRL.algorithm, inputBuffer);
 
     printf("Enter Parameters for CRL: ");
     fgets(inputBuffer, sizeof(inputBuffer), stdin);
     fprintf(crlFile, "Parameters: %s", inputBuffer);
+    strcpy(newCRL.parameters, inputBuffer);
+
 
     printf("Enter Issuer Name for CRL: ");
     fgets(inputBuffer, sizeof(inputBuffer), stdin);
     fprintf(crlFile, "Issuer Name: %s", inputBuffer);
+    strcpy(newCRL.issuerName, inputBuffer);
 
     time_t thisUpdate = time(NULL);
     time_t nextUpdate = thisUpdate + VALID_DURATION_SECONDS;
@@ -497,9 +500,6 @@ crlInfo newCRLFile(char crlFileName[], unsigned int privateKey, unsigned int pub
     fclose(crlFile);
 
     strcpy(newCRL.crlFileName, crlFileName);
-    strcpy(newCRL.algorithm, inputBuffer);
-    strcpy(newCRL.parameters, inputBuffer);
-    strcpy(newCRL.issuerName, inputBuffer);
     newCRL.thisUpdate = thisUpdate;
     newCRL.nextUpdate = nextUpdate;
     newCRL.numEntries = 0;
