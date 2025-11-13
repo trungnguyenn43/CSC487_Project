@@ -206,7 +206,7 @@ void signFile(char fileName[], unsigned int privateKey, unsigned int publicKey, 
         return;
     }
 
-    FILE *certFile = fopen(fileName, "rw+");
+    FILE *certFile = fopen(fileName, "r+");
     if (certFile == NULL)
     {
         printf("Error opening file for signing.\n");
@@ -227,7 +227,7 @@ void signFile(char fileName[], unsigned int privateKey, unsigned int publicKey, 
     fprintf(certFile, "\n");
     strcat(fileContent, "\n"); // include the newline in the content to be hashed
     fprintf(certFile, "Public Key: %u %u\n", publicKey, n);
-    sprintf(inputBuffer, "Public Key: %u %u\n", publicKey, n);
+    snprintf(inputBuffer, sizeof(inputBuffer), "Public Key: %u %u\n", publicKey, n);
     strcat(fileContent, inputBuffer); // include public key line in content to be hashed
 
     char computedHash[3] = {'\0'};
@@ -478,18 +478,21 @@ crlInfo newCRLFile(char crlFileName[], unsigned int privateKey, unsigned int pub
     // need: algorithm, parameters, issuer name, this update date, next update date, entries
     printf("Enter Algorithm for CRL: ");
     fgets(inputBuffer, sizeof(inputBuffer), stdin);
-    fprintf(crlFile, "Algorithm: %s", inputBuffer);
+    inputBuffer[strcspn(inputBuffer, "\n")] = 0;
+    fprintf(crlFile, "Algorithm: %s\n", inputBuffer);
     strcpy(newCRL.algorithm, inputBuffer);
 
     printf("Enter Parameters for CRL: ");
     fgets(inputBuffer, sizeof(inputBuffer), stdin);
-    fprintf(crlFile, "Parameters: %s", inputBuffer);
+    inputBuffer[strcspn(inputBuffer, "\n")] = 0;
+    fprintf(crlFile, "Parameters: %s\n", inputBuffer);
     strcpy(newCRL.parameters, inputBuffer);
 
 
     printf("Enter Issuer Name for CRL: ");
     fgets(inputBuffer, sizeof(inputBuffer), stdin);
-    fprintf(crlFile, "Issuer Name: %s", inputBuffer);
+    inputBuffer[strcspn(inputBuffer, "\n")] = 0;
+    fprintf(crlFile, "Issuer Name: %s\n", inputBuffer);
     strcpy(newCRL.issuerName, inputBuffer);
 
     time_t thisUpdate = time(NULL);
