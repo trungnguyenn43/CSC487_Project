@@ -15,8 +15,8 @@ struct crlInfo {
     char algorithm[50];
     char parameters[100];
     char issuerName[100];
-    time_t thisUpdate = time(NULL);
-    time_t nextUpdate = thisUpdate + 24 * 60 * 60;
+    time_t thisUpdate;
+    time_t nextUpdate;
     int numEntries = 0;
     unsigned int privateKey;
     unsigned int publicKey;

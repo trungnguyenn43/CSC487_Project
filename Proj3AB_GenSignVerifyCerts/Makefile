@@ -18,4 +18,4 @@ SDES.o: SDES.c SDES.h
 	g++ -c -g -std=c++11 SDES.h SDES.c 
 
 clean:
-	rm -f Server Client *.o
+	rm -f Server Client *.o *h.gch
