@@ -8,22 +8,7 @@
 #include "certs.h"
 
 static char IV[3] = "1A";
-static char CBC_KEY[4] = "B2C";
-
-struct certInfo{
-    char version[256];
-    char serialNumber[256];
-    int levelOfTrust;
-    char algorithm[50];
-    char parameters[100];
-    char issuerName[100];
-    time_t notBefore;
-    time_t notAfter;
-    char subjectName[100];
-    unsigned int publicKey;
-    unsigned int n;
-    unsigned int signature;
-};
+static char CBC_KEY[4] = "CCB";
 
 
 void certGen(unsigned int privateKey, unsigned int publicKey, unsigned int n)

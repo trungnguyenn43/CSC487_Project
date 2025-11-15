@@ -21,13 +21,14 @@
 #include "DiffHellman.h"
 #include "SDES.h"
 #include "UtilFunction.h"
+#include "certs.h"
 
 static char SERVER_ADDR[26] = "10.0.0.2"; // IP address of the server by default
 int SERVER_PORT = 49152;				  // Port number of the server by default
 static char CBC_Hash_KEY[4] = "CCB"; //key for CBC Hash
-static char CBC_IV[3] = "01"; // IV for CBC Hash
+static char CBC_IV[3] = "1A"; // IV for CBC Hash
 
-void corectKeyLength(const int, char[4]);
+void correctKeyLength(const int, char[4]);
 void messageServer(char[4], char[100], bool *);
 void decipherMessage(char[4], char[100], const int, bool *);
 
@@ -48,7 +49,7 @@ int main(int argc, char *argv[])
 	do{
 		printf("Enter two distinct prime numbers (p and q): ");
 		scanf("%u %u", &p, &q);
-		printf("Checking if p and q are coprime...\n");
+		printf("Checking if p and q are co-prime...\n");
 		getchar(); // clear newline character from input buffer
 
 		//checking if both numbers are prime
@@ -58,9 +59,9 @@ int main(int argc, char *argv[])
 		}
 
 		if(gcd(p, q) != 1){
-			printf("p and q are not coprime. Please enter again.\n");
+			printf("p and q are not co-prime. Please enter again.\n");
 		} else {
-			printf("p and q are coprime. Continue...\n\n");
+			printf("p and q are co-prime. Continue...\n\n");
 			break;
 		}
 
@@ -107,7 +108,7 @@ int main(int argc, char *argv[])
 
 	printf("Using server IP: %s, Port: %d\n", SERVER_ADDR, SERVER_PORT);
 
-	int socket_desc; // file descripter returned by socket command
+	int socket_desc; // file descriptor returned by socket command
 	int read_size;
 	struct sockaddr_in server;					 // in arpa/inet.h
 	char server_reply[100], client_message[100]; // will need to be bigger
@@ -149,7 +150,6 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	//TODO: continute to process RSA signed Diff Hellman Key Exchange
 
 	printf("========= Diff Hellman Key Exchange ==========\n");
 	//=========================
@@ -233,7 +233,7 @@ int main(int argc, char *argv[])
 	hashValue = strtol(tempOutputBuffer, NULL, 16);
 	printf("INFO: CBC Hash of public key, prime, and alpha: %d\n", hashValue);
 	
-	//Encrypte the hash with RSA private key to create signature
+	//Encrypt the hash with RSA private key to create signature
 	signature = modExp(hashValue, rsa_private_key, n);
 	printf("INFO: Generated RSA signature: %u\n\n", signature);
 
@@ -254,7 +254,7 @@ int main(int argc, char *argv[])
 
 	char plaintext[9], key[4]; // 8 bits + null terminator, 3 bits + null terminator
 	printf("INFO: Shared key: %d\n", shareKey);
-	corectKeyLength(shareKey, key);
+	correctKeyLength(shareKey, key);
 	printf("INFO: Using SDES with shared key: %s\n", key);
 
 	bool isExit = false;
@@ -306,7 +306,7 @@ int main(int argc, char *argv[])
 	return 0;
 }
 
-void corectKeyLength(const int key, char keyStr[4])
+void correctKeyLength(const int key, char keyStr[4])
 {
 	// Get the last 3 digits of the integer and convert them to hexadecimal
 	int lastThreeDigits = key % 1000;

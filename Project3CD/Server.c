@@ -15,14 +15,14 @@
 
 
 // Function prototypes
-void corectKeyLength(const int, char[4]);
+void correctKeyLength(const int, char[4]);
 void decipherMessage(char[4], char[100], const int, bool *);
 void messageClient(char[4], char[100], bool *);
 
 // Define server port
 const int SERVER_PORT = 49152; // Port number of the server
 static char CBC_Hash_KEY[4] = "CCB"; //key for CBC Hash
-static char CBC_IV[3] = "01"; // IV for CBC Hash
+static char CBC_IV[3] = "1A"; // IV for CBC Hash
 
 int main(int argc, char *argv[])
 {	
@@ -126,7 +126,7 @@ int main(int argc, char *argv[])
 	sscanf(client_message, "%u %u", &client_rsa_public_key, &client_n); // just to check if it's a valid integer
 	printf("INFO: Client sent RSA public key: %s\n\n", client_message);
 
-	//TODO: continute to process RSA signed Diff Hellman Key Exchange
+	//TODO: continue to process RSA signed Diff Hellman Key Exchange
 
 	printf("========= Diff Hellman Key Exchange ==========\n");
 	// generate and display public key
@@ -161,7 +161,7 @@ int main(int argc, char *argv[])
 	int hashValue = (int)strtol(tempOutputBuffer, NULL, 16);
 	printf("INFO: CBC Hash of public key, prime, and alpha: %d\n", hashValue);
 	
-	//Encrypte the hash with RSA private key to create signature
+	//Encrypt the hash with RSA private key to create signature
 	unsigned int signature = modExp(hashValue, rsa_private_key, n);
 	printf("INFO: Generated RSA signature: %u\n", signature);
 	printf("============ END OF SIGNATURE GENERATION ============\n\n");
@@ -212,7 +212,7 @@ int main(int argc, char *argv[])
 	printf("INFO: Shared key: %d\n", shareKey);
 
 	char key[4];					// 3 hex digits + null terminator
-	corectKeyLength(shareKey, key); // Convert int to 3-char string with leading zeros if necessary
+	correctKeyLength(shareKey, key); // Convert int to 3-char string with leading zeros if necessary
 
 	printf("INFO: Using SDES with shared key: %s\n", key);
 
@@ -269,7 +269,7 @@ int main(int argc, char *argv[])
 	return 0;
 }
 
-void corectKeyLength(const int key, char keyStr[4])
+void correctKeyLength(const int key, char keyStr[4])
 {
 	// Get the last 3 digits of the integer and convert them to hexadecimal
 	int lastThreeDigits = key % 1000;
