@@ -1,0 +1,12 @@
+Version: 2
+Certificate Serial Number: 123
+Level of Trust: 5
+Algorithm: rsa
+Parameters: 12
+Issuer Name: Norman
+Not Before: 1763176517
+Not After: 1763176519
+Subject Name: Nguyen
+
+Public Key: 19 3233
+Signature: 1376
