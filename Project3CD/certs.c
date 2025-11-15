@@ -10,10 +10,9 @@
 static char IV[3] = "1A";
 static char CBC_KEY[4] = "CCB";
 
-
 void certGen(unsigned int privateKey, unsigned int publicKey, unsigned int n)
 {
-    struct certInfo cert;
+    certInfo cert;
     char inputBuffer[256];
     char fileName[100];
 
@@ -38,7 +37,8 @@ void certGen(unsigned int privateKey, unsigned int publicKey, unsigned int n)
     fgets(cert.serialNumber, sizeof(cert.serialNumber), stdin);
     cert.serialNumber[strcspn(cert.serialNumber, "\n")] = 0;
 
-    do {
+    do
+    {
         printf("Enter Level of Trust (0-7): ");
         fgets(inputBuffer, sizeof(inputBuffer), stdin);
         if (sscanf(inputBuffer, "%d", &cert.levelOfTrust) == 1 && cert.levelOfTrust >= 0 && cert.levelOfTrust <= 7)
@@ -63,9 +63,14 @@ void certGen(unsigned int privateKey, unsigned int publicKey, unsigned int n)
     fgets(inputBuffer, sizeof(inputBuffer), stdin);
     int validDuration;
     if (sscanf(inputBuffer, "%d", &validDuration))
+    {
         cert.notAfter = cert.notBefore + validDuration;
+    }
     else
+    {   
+        printf("Invalid input. Using default valid duration of %d seconds.\n", VALID_DURATION_SECONDS);
         cert.notAfter = cert.notBefore + VALID_DURATION_SECONDS;
+    }
 
     printf("Enter Subject Name: ");
     fgets(cert.subjectName, sizeof(cert.subjectName), stdin);
@@ -96,7 +101,7 @@ void certGen(unsigned int privateKey, unsigned int publicKey, unsigned int n)
 
 int certVerify(const crlEntry entryList[], int numEntries)
 {
-    struct certInfo cert;
+    certInfo cert;
     char inputBuffer[256];
     char fileName[256];
 
@@ -170,11 +175,13 @@ int certVerify(const crlEntry entryList[], int numEntries)
     return 1;
 }
 
-void signFile(char fileName[], unsigned int privateKey, unsigned int publicKey, unsigned int n){
+void signFile(char fileName[], unsigned int privateKey, unsigned int publicKey, unsigned int n)
+{
     char inputBuffer[256];
 
     // file name check
-    if(strlen(fileName) == 0){
+    if (strlen(fileName) == 0)
+    {
         printf("Error: File name is empty.\n");
         return;
     }
@@ -187,15 +194,15 @@ void signFile(char fileName[], unsigned int privateKey, unsigned int publicKey, 
     }
 
     fseek(certFile, 0, SEEK_SET); // move pointer to beginning of file
-    
+
     char fileContent[1024];
     memset(fileContent, '\0', sizeof(fileContent));
 
-    while(fgets(inputBuffer, sizeof(inputBuffer), certFile) != NULL)
-    {   
+    while (fgets(inputBuffer, sizeof(inputBuffer), certFile) != NULL)
+    {
         strcat(fileContent, inputBuffer);
     }
-    
+
     fseek(certFile, 0, SEEK_END); // move pointer to EOF
     fprintf(certFile, "\n");
     strcat(fileContent, "\n"); // include the newline in the content to be hashed
@@ -208,19 +215,21 @@ void signFile(char fileName[], unsigned int privateKey, unsigned int publicKey, 
 
     unsigned int hashValue = (unsigned int)strtol(computedHash, NULL, 16); // convert hash to integer
 
-    //write to the end of file
+    // write to the end of file
     fprintf(certFile, "Signature: %d\n", modExp(hashValue, privateKey, n));
 
     fclose(certFile);
 }
 
-int verifyFileSignature(char fileName[]){
+int verifyFileSignature(char fileName[])
+{
     char inputBuffer[256];
     unsigned int publicKey, n;
     unsigned int certSignature;
 
     // file name check
-    if(strlen(fileName) == 0){
+    if (strlen(fileName) == 0)
+    {
         printf("Error: File name is empty.\n");
         return -1;
     }
@@ -231,15 +240,15 @@ int verifyFileSignature(char fileName[]){
         printf("Error opening file for signature verification.\n");
         return -1;
     }
-    
+
     char fileContent[1024];
     memset(fileContent, '\0', sizeof(fileContent));
-    
+
     fseek(certFile, 0, SEEK_SET); // move pointer to beginning of file
 
-    while(fgets(inputBuffer, sizeof(inputBuffer), certFile) != NULL)
-    {      
-        if(strncmp(inputBuffer, "Signature:", 10) == 0)
+    while (fgets(inputBuffer, sizeof(inputBuffer), certFile) != NULL)
+    {
+        if (strncmp(inputBuffer, "Signature:", 10) == 0)
         {
             // extract signature
             sscanf(inputBuffer, "Signature: %u", &certSignature);
@@ -277,11 +286,10 @@ int verifyFileSignature(char fileName[]){
         printf("File %s signature is invalid.\n", fileName);
         return 0;
     }
-
 }
 
 void addCRLEntry(crlEntry entryList[], int *numEntries)
-{   
+{
     char inputBuffer[256];
     printf("Enter Certificate Serial Number to revoke: ");
     fgets(inputBuffer, sizeof(inputBuffer), stdin);
@@ -327,16 +335,17 @@ void rmCRLEntry(crlEntry entryList[], int *numEntries, const char serialNumber[]
 }
 
 int loadCRLEntry(crlInfo *crlFileInfo, crlEntry entryList[], unsigned int privateKey, unsigned int publicKey, unsigned int n)
-{   
+{
     // file name check
-    if(strlen(crlFileInfo->crlFileName) == 0){
+    if (strlen(crlFileInfo->crlFileName) == 0)
+    {
         printf("Error: CRL file name is empty.\n");
         return -2;
     }
 
     FILE *crlFile;
     crlFile = fopen(crlFileInfo->crlFileName, "r");
-    
+
     if (crlFile == NULL)
     {
         printf("CRL file not found. Creating a new CRL file.\n");
@@ -357,8 +366,8 @@ int loadCRLEntry(crlInfo *crlFileInfo, crlEntry entryList[], unsigned int privat
     }
     fseek(crlFile, 0, SEEK_SET); // Reset file pointer to the beginning
 
-
-    if(verifyFileSignature(crlFileInfo->crlFileName) != 1){
+    if (verifyFileSignature(crlFileInfo->crlFileName) != 1)
+    {
         printf("Authentication failed!\n");
         fclose(crlFile);
         return -1;
@@ -378,7 +387,7 @@ int loadCRLEntry(crlInfo *crlFileInfo, crlEntry entryList[], unsigned int privat
     sscanf(inputBuffer, "Next Update: %ld", &crlFileInfo->nextUpdate);
 
     while (fgets(inputBuffer, sizeof(inputBuffer), crlFile) != NULL)
-    {   
+    {
         struct crlEntry entry;
         if (strncmp(inputBuffer, "Entry:", 6) == 0)
         {
@@ -388,7 +397,6 @@ int loadCRLEntry(crlInfo *crlFileInfo, crlEntry entryList[], unsigned int privat
             entryList[crlFileInfo->numEntries] = entry;
             crlFileInfo->numEntries++;
         }
-        
     }
 
     printf("Loaded %d CRL entries from file.\n\n", crlFileInfo->numEntries);
@@ -399,10 +407,11 @@ int loadCRLEntry(crlInfo *crlFileInfo, crlEntry entryList[], unsigned int privat
 }
 
 void saveCRL(crlInfo *crlFileInfo, crlEntry entryList[], unsigned int privateKey, unsigned int publicKey, unsigned int n)
-{   
+{
     char inputBuffer[256];
 
-    if(strlen(crlFileInfo->crlFileName) == 0){
+    if (strlen(crlFileInfo->crlFileName) == 0)
+    {
         printf("Error: CRL file name is empty.\n");
         return;
     }
@@ -414,16 +423,13 @@ void saveCRL(crlInfo *crlFileInfo, crlEntry entryList[], unsigned int privateKey
         return;
     }
 
-    crlFileInfo->thisUpdate = time(NULL);
-    crlFileInfo->nextUpdate = crlFileInfo->thisUpdate + VALID_DURATION_SECONDS;
-
     // write CRL info
     fprintf(crlFile, "Algorithm: %s\n", crlFileInfo->algorithm);
     fprintf(crlFile, "Parameters: %s\n", crlFileInfo->parameters);
     fprintf(crlFile, "Issuer Name: %s\n", crlFileInfo->issuerName);
     fprintf(crlFile, "This Update: %ld\n", crlFileInfo->thisUpdate);
     fprintf(crlFile, "Next Update: %ld\n", crlFileInfo->nextUpdate);
-    
+
     for (int i = 0; i < crlFileInfo->numEntries; i++)
     {
         fprintf(crlFile, "Entry:\n");
@@ -436,7 +442,7 @@ void saveCRL(crlInfo *crlFileInfo, crlEntry entryList[], unsigned int privateKey
 }
 
 crlInfo newCRLFile(char crlFileName[], unsigned int privateKey, unsigned int publicKey, unsigned int n)
-{   
+{
     char inputBuffer[256];
     crlInfo newCRL;
 
@@ -461,7 +467,6 @@ crlInfo newCRLFile(char crlFileName[], unsigned int privateKey, unsigned int pub
     fprintf(crlFile, "Parameters: %s\n", inputBuffer);
     strcpy(newCRL.parameters, inputBuffer);
 
-
     printf("Enter Issuer Name for CRL: ");
     fgets(inputBuffer, sizeof(inputBuffer), stdin);
     inputBuffer[strcspn(inputBuffer, "\n")] = 0;
@@ -469,7 +474,20 @@ crlInfo newCRLFile(char crlFileName[], unsigned int privateKey, unsigned int pub
     strcpy(newCRL.issuerName, inputBuffer);
 
     time_t thisUpdate = time(NULL);
-    time_t nextUpdate = thisUpdate + VALID_DURATION_SECONDS;
+    time_t nextUpdate = thisUpdate;
+    printf("Enter valid duration for CRL (in seconds): ");
+    fgets(inputBuffer, sizeof(inputBuffer), stdin);
+    int validDuration;
+    if (sscanf(inputBuffer, "%d", &validDuration))
+    {
+        nextUpdate = thisUpdate + validDuration;
+    }
+    else
+    {
+        printf("Invalid input. Using default valid duration of %d seconds.\n", VALID_DURATION_SECONDS);
+        nextUpdate = thisUpdate + VALID_DURATION_SECONDS;
+    }
+
     fprintf(crlFile, "This Update: %ld\n", thisUpdate);
     fprintf(crlFile, "Next Update: %ld\n", nextUpdate);
 

@@ -5,6 +5,21 @@
 
 const int VALID_DURATION_SECONDS = 24 * 60 * 60; // 1 day
 
+struct certInfo{
+    char version[256];
+    char serialNumber[256];
+    int levelOfTrust;
+    char algorithm[50];
+    char parameters[100];
+    char issuerName[100];
+    time_t notBefore;
+    time_t notAfter;
+    char subjectName[100];
+    unsigned int publicKey;
+    unsigned int n;
+    unsigned int signature;
+};
+
 struct crlEntry {
     char serialNumber[256];
     time_t revocationDate;
