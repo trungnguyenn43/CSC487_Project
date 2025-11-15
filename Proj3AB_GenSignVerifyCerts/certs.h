@@ -23,6 +23,21 @@ struct crlInfo {
     unsigned int n;
 };
 
+struct certInfo{
+    char version[256];
+    char serialNumber[256];
+    int levelOfTrust;
+    char algorithm[50];
+    char parameters[100];
+    char issuerName[100];
+    time_t notBefore;
+    time_t notAfter;
+    char subjectName[100];
+    unsigned int publicKey;
+    unsigned int n;
+    unsigned int signature;
+};
+
 void certGen(unsigned int , unsigned int, unsigned int );
 
 int certVerify(const crlEntry [], int);
