@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,16 +10,31 @@
 static char IV[3] = "1A";
 static char CBC_KEY[4] = "B2C";
 
+struct certInfo{
+    char version[256];
+    char serialNumber[256];
+    int levelOfTrust;
+    char algorithm[50];
+    char parameters[100];
+    char issuerName[100];
+    time_t notBefore;
+    time_t notAfter;
+    char subjectName[100];
+    unsigned int publicKey;
+    unsigned int n;
+    unsigned int signature;
+};
+
 
 void certGen(unsigned int privateKey, unsigned int publicKey, unsigned int n)
 {
+    struct certInfo cert;
     char inputBuffer[256];
     char fileName[100];
 
     // file name
     printf("Enter output certificate file name: ");
     fgets(fileName, sizeof(fileName), stdin);
-    // remove newline character from fgets
     fileName[strcspn(fileName, "\n")] = 0;
 
     FILE *certFile = fopen(fileName, "w");
@@ -30,81 +44,61 @@ void certGen(unsigned int privateKey, unsigned int publicKey, unsigned int n)
         return;
     }
 
-    // get information from user
-
-    // need: version, cert serial #, algorithm, parameters,
-    // issuer name, not before, not after, subject name
-    // algorithm, parameters, public key, signature
-
-    // Version
+    // Populate certInfo struct
     printf("Enter Version: ");
-    fgets(inputBuffer, sizeof(inputBuffer), stdin);
-    fprintf(certFile, "Version: %s", inputBuffer);
+    fgets(cert.version, sizeof(cert.version), stdin);
+    cert.version[strcspn(cert.version, "\n")] = 0;
 
-    // Certificate Serial Number
     printf("Enter Certificate Serial Number: ");
-    fgets(inputBuffer, sizeof(inputBuffer), stdin);
-    fprintf(certFile, "Certificate Serial Number: %s", inputBuffer);
+    fgets(cert.serialNumber, sizeof(cert.serialNumber), stdin);
+    cert.serialNumber[strcspn(cert.serialNumber, "\n")] = 0;
 
-    // Level of trust
-    do{
+    do {
         printf("Enter Level of Trust (0-7): ");
         fgets(inputBuffer, sizeof(inputBuffer), stdin);
-        
-        int level = -1;
-        if(sscanf(inputBuffer, "%d", &level) != 1){
-            printf("Invalid input. Please enter again.\n");
-            continue;
-        }
-        
-        if(level >=0 && level <=7){
-            fprintf(certFile, "Level of Trust: %s", inputBuffer);
+        if (sscanf(inputBuffer, "%d", &cert.levelOfTrust) == 1 && cert.levelOfTrust >= 0 && cert.levelOfTrust <= 7)
             break;
-        }
-        else{
-            printf("Invalid level of trust. Please enter again.\n");
-        }
-        
-    }while(1);
-    
+        printf("Invalid input. Please enter again.\n");
+    } while (1);
 
-    // Algorithm
     printf("Enter Algorithm: ");
-    fgets(inputBuffer, sizeof(inputBuffer), stdin);
-    fprintf(certFile, "Algorithm: %s", inputBuffer);
+    fgets(cert.algorithm, sizeof(cert.algorithm), stdin);
+    cert.algorithm[strcspn(cert.algorithm, "\n")] = 0;
 
-    // Parameters
     printf("Enter Parameters: ");
-    fgets(inputBuffer, sizeof(inputBuffer), stdin);
-    fprintf(certFile, "Parameters: %s", inputBuffer);
+    fgets(cert.parameters, sizeof(cert.parameters), stdin);
+    cert.parameters[strcspn(cert.parameters, "\n")] = 0;
 
-    // Issuer Name
     printf("Enter Issuer Name: ");
-    fgets(inputBuffer, sizeof(inputBuffer), stdin);
-    fprintf(certFile, "Issuer Name: %s", inputBuffer);
+    fgets(cert.issuerName, sizeof(cert.issuerName), stdin);
+    cert.issuerName[strcspn(cert.issuerName, "\n")] = 0;
 
-    // Validity Period
-    time_t validFromTime = time(NULL);
-    time_t expireTime = validFromTime;
-    // Not Before
-    fprintf(certFile, "Not Before: %ld\n", validFromTime);
-    
-    print("Enter valid duration (in seconds): ")
+    cert.notBefore = time(NULL);
+    printf("Enter valid duration (in seconds): ");
     fgets(inputBuffer, sizeof(inputBuffer), stdin);
     int validDuration;
-    if(sscanf(inputbuffer, "%d", &validDuration)){
-        expireTime = validFromTime + validDuration;
-    }else{
-        printf("Invalid input. Use default duration of 1 day.\n");
-        expireTime = validFromTime + VALID_DURATION_SECONDS;
-    }
-    // Not After
-    fprintf(certFile, "Not After: %ld\n", expireTime);
+    if (sscanf(inputBuffer, "%d", &validDuration))
+        cert.notAfter = cert.notBefore + validDuration;
+    else
+        cert.notAfter = cert.notBefore + VALID_DURATION_SECONDS;
 
-    // Subject Name
     printf("Enter Subject Name: ");
-    fgets(inputBuffer, sizeof(inputBuffer), stdin);
-    fprintf(certFile, "Subject Name: %s", inputBuffer);
+    fgets(cert.subjectName, sizeof(cert.subjectName), stdin);
+    cert.subjectName[strcspn(cert.subjectName, "\n")] = 0;
+
+    cert.publicKey = publicKey;
+    cert.n = n;
+
+    // Write certInfo to file
+    fprintf(certFile, "Version: %s\n", cert.version);
+    fprintf(certFile, "Certificate Serial Number: %s\n", cert.serialNumber);
+    fprintf(certFile, "Level of Trust: %d\n", cert.levelOfTrust);
+    fprintf(certFile, "Algorithm: %s\n", cert.algorithm);
+    fprintf(certFile, "Parameters: %s\n", cert.parameters);
+    fprintf(certFile, "Issuer Name: %s\n", cert.issuerName);
+    fprintf(certFile, "Not Before: %ld\n", cert.notBefore);
+    fprintf(certFile, "Not After: %ld\n", cert.notAfter);
+    fprintf(certFile, "Subject Name: %s\n", cert.subjectName);
 
     fclose(certFile);
 
@@ -116,94 +110,78 @@ void certGen(unsigned int privateKey, unsigned int publicKey, unsigned int n)
 }
 
 int certVerify(const crlEntry entryList[], int numEntries)
-{   
+{
+    struct certInfo cert;
     char inputBuffer[256];
     char fileName[256];
-    char valueString[1024]; // string temp to hold all cert values for signing
-    memset(valueString, '\0', sizeof(valueString));
 
-    char publicKeyStr[5];
-    unsigned int certSignature;
-    unsigned int publicKey;
-    unsigned int n;
-
-    // file name
     printf("Enter certificate file name to verify: ");
-    fgets(inputBuffer, sizeof(inputBuffer), stdin);
-    // remove newline character from fgets
-    inputBuffer[strcspn(inputBuffer, "\n")] = 0;
-    strcpy(fileName, inputBuffer);
+    fgets(fileName, sizeof(fileName), stdin);
+    fileName[strcspn(fileName, "\n")] = 0;
 
-    if(verifyFileSignature(fileName) != 1){
+    if (verifyFileSignature(fileName) != 1)
+    {
         printf("=================================\n\n");
         return -1;
-    };
+    }
 
-    FILE *certFile = fopen(inputBuffer, "r");
+    FILE *certFile = fopen(fileName, "r");
     if (certFile == NULL)
     {
         printf("Error opening certificate file for reading.\n");
-        fclose(certFile);
         return -1;
     }
-    fseek(certFile, 0, SEEK_SET); // move pointer to beginning of file
 
-    time_t currentTime = time(NULL);
-    time_t notBefore, notAfter;
-    while(fgets(inputBuffer, sizeof(inputBuffer), certFile) != NULL)
-    {   
-        if(strncmp(inputBuffer, "Certificate Serial Number:", 26) == 0)
-        {   
-            inputBuffer[strcspn(inputBuffer, "\n")] = 0;
-            // extract serial number
-            char serialNumber[256];
-            sscanf(inputBuffer, "Certificate Serial Number: %s", serialNumber);
-            
-            // check if serial number is in CRL
-            for(int i = 0; i < numEntries; i++){
-                if(strcmp(serialNumber, entryList[i].serialNumber) == 0){
-                    printf("Certificate with Serial Number %s is revoked.\n", serialNumber);
-                    printf("=================================\n\n");
-                    fclose(certFile);
-                    return 0;
-                }
-            }
-            
-            printf("Certificate is not revoked.\n");
-            
-        }
+    // Read certInfo from file
+    while (fgets(inputBuffer, sizeof(inputBuffer), certFile) != NULL)
+    {
+        if (strncmp(inputBuffer, "Version:", 8) == 0)
+            sscanf(inputBuffer, "Version: %255[^\n]", cert.version);
+        else if (strncmp(inputBuffer, "Certificate Serial Number:", 26) == 0)
+            sscanf(inputBuffer, "Certificate Serial Number: %255[^\n]", cert.serialNumber);
+        else if (strncmp(inputBuffer, "Level of Trust:", 15) == 0)
+            sscanf(inputBuffer, "Level of Trust: %d", &cert.levelOfTrust);
+        else if (strncmp(inputBuffer, "Algorithm:", 10) == 0)
+            sscanf(inputBuffer, "Algorithm: %49[^\n]", cert.algorithm);
+        else if (strncmp(inputBuffer, "Parameters:", 11) == 0)
+            sscanf(inputBuffer, "Parameters: %99[^\n]", cert.parameters);
+        else if (strncmp(inputBuffer, "Issuer Name:", 12) == 0)
+            sscanf(inputBuffer, "Issuer Name: %99[^\n]", cert.issuerName);
         else if (strncmp(inputBuffer, "Not Before:", 11) == 0)
-        {
-            // extract not before time
-            sscanf(inputBuffer, "Not Before: %ld", &notBefore);
-        }
+            sscanf(inputBuffer, "Not Before: %ld", &cert.notBefore);
         else if (strncmp(inputBuffer, "Not After:", 10) == 0)
-        {
-            // extract not after time
-            sscanf(inputBuffer, "Not After: %ld", &notAfter);
-            break; // no need to read further
-        }
-
+            sscanf(inputBuffer, "Not After: %ld", &cert.notAfter);
+        else if (strncmp(inputBuffer, "Subject Name:", 13) == 0)
+            sscanf(inputBuffer, "Subject Name: %99[^\n]", cert.subjectName);
     }
 
-    if(currentTime < notBefore){
+    fclose(certFile);
+
+    // Verify certificate validity
+    time_t currentTime = time(NULL);
+    if (currentTime < cert.notBefore)
+    {
         printf("Certificate is not yet valid.\n\n");
-        fclose(certFile);
         return 0;
     }
-    else if(currentTime > notAfter){
+    else if (currentTime > cert.notAfter)
+    {
         printf("Certificate has expired.\n\n");
-        fclose(certFile);
         return 0;
     }
-    else{
-        printf("Certificate is within the validity period.\n");
+
+    // Check if serial number is in CRL
+    for (int i = 0; i < numEntries; i++)
+    {
+        if (strcmp(cert.serialNumber, entryList[i].serialNumber) == 0)
+        {
+            printf("Certificate with Serial Number %s is revoked.\n", cert.serialNumber);
+            return 0;
+        }
     }
 
     printf("Certificate is valid.\n");
     printf("=================================\n\n");
-    
-    fclose(certFile);
     return 1;
 }
 
