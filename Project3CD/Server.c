@@ -12,23 +12,27 @@
 #include "SDES.h"
 #include "DiffHellman.h"
 #include "UtilFunction.h"
-
+#include "certs.h"
 
 // Function prototypes
 void correctKeyLength(const int, char[4]);
-void decipherMessage(char[4], char[100], const int, bool *);
-void messageClient(char[4], char[100], bool *);
+int clientRequest(char [100]);
+void receiveCertFile(int);
+void receiveCertChainFile(int);
+void receiveCRLFile(int);
 
 // Define server port
 const int SERVER_PORT = 49152; // Port number of the server
 static char CBC_Hash_KEY[4] = "CCB"; //key for CBC Hash
 static char CBC_IV[3] = "1A"; // IV for CBC Hash
+const char CRL_FILE_NAME[] = "crl_list.txt";
+
 
 int main(int argc, char *argv[])
 {	
 	int socket_desc, new_socket, c, read_size, i;
 	struct sockaddr_in server, client;
-	char client_message[100];
+	char client_message[1024];
 
 	printf("========= RSA KEY GEN ==========\n");
 	//====================================
@@ -126,8 +130,6 @@ int main(int argc, char *argv[])
 	sscanf(client_message, "%u %u", &client_rsa_public_key, &client_n); // just to check if it's a valid integer
 	printf("INFO: Client sent RSA public key: %s\n\n", client_message);
 
-	//TODO: continue to process RSA signed Diff Hellman Key Exchange
-
 	printf("========= Diff Hellman Key Exchange ==========\n");
 	// generate and display public key
 	int prime = 0;
@@ -200,7 +202,7 @@ int main(int argc, char *argv[])
 
 	if(decryptedHash != hashValue){
 		printf("WARNING: RSA signature verification failed! Be cautious...\n");
-		close(socket_desc);
+		close(new_socket);
 		return 1;
 	} else {
 		printf("INFO: RSA signature verification succeeded. Continuing...\n");
@@ -220,51 +222,44 @@ int main(int argc, char *argv[])
 
 	// Server will start receive first
 	printf("\n===== MESSAGE EXCHANGE SESSION =====\n");
-	printf("WAITING FOR CLIENT MESSAGE...\n");
-
+	
 	while (!isExit)
-	{
-		// Receive a message from client
-		if ((read_size = recv(new_socket, client_message, 100, 0)) > 0)
-		{
-			if (read_size == -1)
-			{
-				printf("ERROR: receive failed");
+	{	
+		printf("WAITING FOR CLIENT MESSAGE...\n");
+		recv(new_socket, client_message, 1024, 0) > 0;
+		int requestType = clientRequest(client_message);
+		switch(requestType){
+			case 0:
+				printf("INFO: Client requested to exit the session.\n");
 				isExit = true;
 				break;
-			}
-
-			printf("INFO: Client sent %d byte message:  %s\n", read_size, client_message);
-
-			decipherMessage(key, client_message, read_size, &isExit);
-
-			/*
-				If the client sent an exit message with the correct key, the isExit flag will be set to true
-				The exit message format is "exit+<key>", where <key> is the shared key in hexadecimal format
-			*/
-
-			if (isExit)
+			case 1:
+				printf("INFO: Client requested certificate transfer.\n");
+				receiveCertFile(new_socket);
 				break;
-
-			// write message back to client
-			messageClient(key, client_message, &isExit);
-
-			// send the encrypted message to client
-			write(new_socket, client_message, strlen(client_message));
-
-			if (isExit)
+			case 2:
+				printf("INFO: Client requested certificate chain transfer.\n");
+				receiveCertChainFile(new_socket);
 				break;
-
-			printf("WAITING FOR CLIENT MESSAGE...\n");
-
-			memset(client_message, '\0', 100); // Clear the buffer for next message
+			case 3:
+				printf("INFO: Client requested CRL transfer.\n");
+				receiveCRLFile(new_socket);
+				break;
+			default:
+				printf("WARNING: Unknown request from client: %s\n", client_message);
+				break;
 		}
+		if(isExit){
+			break;
+		}
+		printf("======================================\n");
 	}
 
 	// Free character arrays
 	memset(client_message, '\0', 100); // Clear the buffer
 
 	// Free the socket pointer
+	close(new_socket);
 	close(socket_desc);
 	return 0;
 }
@@ -278,77 +273,133 @@ void correctKeyLength(const int key, char keyStr[4])
 	keyStr[3] = '\0';
 }
 
-void decipherMessage(char key[4], char client_message[100], const int read_size, bool *isExit)
-{
-	char tempMessage[read_size / 2 + 1]; // 2 hex digits, +1 for null terminator
-	memset(tempMessage, '\0', sizeof(tempMessage));
-
-	for (int i = 0; i < read_size; i += 2)
+int clientRequest(char inputMessage[100]){
+	
+	int requestType = -99; // default invalid request
+	if (strncmp(inputMessage, "CERT_TRANSFER", strlen("CERT_TRANSFER")) == 0)
 	{
-		char tempHex[3] = {'\0'};				 // 2 hex digits + null terminator
-		strncpy(tempHex, client_message + i, 2); // Extract 2 hex digits
-		SDES_decrypt(tempHex, key, tempHex);
-
-		// Convert decrypted hex back to a character
-		char tempChar = (char)strtol(tempHex, NULL, 16); // Convert hex to char
-		tempMessage[i / 2] = tempChar;
+		requestType = 1;
 	}
-
-	tempMessage[read_size / 2] = '\0'; // Null terminate the decrypted message
-
-	if (strncmp(tempMessage, "exit+", 5) == 0 && strcmp(tempMessage + 5, key) == 0)
+	else if(strncmp(inputMessage, "CERT_CHAIN_TRANSFER", strlen("CERT_CHAIN_TRANSFER")) == 0)
 	{
-		*isExit = true;
-		printf("INFO: Client requested to exit with correct key. Exiting...\n");
+		requestType = 2;
+	}
+	else if(strncmp(inputMessage, "CRL_TRANSFER", strlen("CRL_TRANSFER")) == 0)
+	{
+		requestType = 3;
+	}
+	else if(strncmp(inputMessage, "EXIT", strlen("EXIT")) == 0)
+	{
+		requestType = 0; // exit request
+	}
+	
+	return requestType;
+}
+
+void receiveCertFile(int socket_desc) {
+
+    // Acknowledge the certificate transfer request
+    send(socket_desc, "CERT_TRANSFER_ACK", strlen("CERT_TRANSFER_ACK"), 0);
+	
+    char client_message[1024]; // Buffer for receiving data
+    memset(client_message, '\0', sizeof(client_message));
+	
+    printf("INFO: Receiving certificate file from client...\n");
+
+	FILE *tempFile = fopen("SV_temp_cert_file.txt", "wb");
+	if (!tempFile) {
+		printf("ERROR: Cannot open temp file for writing.\n");
 		return;
 	}
 
-	printf("=== DECRYPTED MESSAGE ===\n");
-	printf("%s\n", tempMessage);
-	printf("=== END OF MESSAGE ===\n\n");
+	while (1) {
+		int bytesReceived = recv(socket_desc, client_message, sizeof(client_message), 0);
+		if (bytesReceived <= 0) {
+			printf("ERROR: Failed to receive certificate file data.\n");
+			break;
+		}
+		// Check for end of transfer signal
+		if (bytesReceived >= strlen("CERT_TRANSFER_END") &&
+			memcmp(client_message, "CERT_TRANSFER_END", strlen("CERT_TRANSFER_END")) == 0) {
+			break;
+		}
+		fwrite(client_message, 1, bytesReceived, tempFile);
+	}
+
+	fclose(tempFile);
+	printf("INFO: Certificate file saved to temp_cert_file.txt\n");
+	printf("Done \n");
+
+	return;
 }
 
-void messageClient(char key[4], char client_message[100], bool *isExit)
-{
-	// Clear buffer
-	memset(client_message, '\0', sizeof(*client_message));
+void receiveCertChainFile(int socket_desc) {
+	
+	// Acknowledge the chain transfer request
+	send(socket_desc, "CERT_CHAIN_TRANSFER_ACK", strlen("CERT_CHAIN_TRANSFER_ACK"), 0);
 
-	char tempMessage[100];
-	memset(tempMessage, '\0', sizeof(tempMessage));
+	char client_message[1024];
+	memset(client_message, '\0', sizeof(client_message));
 
-	printf("Enter message to send to client (type 'exit' to quit): ");
-	printf(">> ");
-	fgets(tempMessage, sizeof(tempMessage) - 1, stdin);
+	printf("INFO: Receiving certificate chain file from client...\n");
 
-	// Remove newline character from fgets
-	size_t len = strlen(tempMessage);
-	if (len > 0 && tempMessage[len - 1] == '\n')
-	{
-		tempMessage[len - 1] = '\0';
+	FILE *tempFile = fopen("SV_temp_chain_file.txt", "wb");
+	if (!tempFile) {
+		printf("ERROR: Cannot open temp chain file for writing.\n");
+		return;
 	}
 
-	if (strcmp(tempMessage, "exit") == 0)
-	{
-		*isExit = true;
-		printf("INFO: Exiting...\n");
-		strcpy(tempMessage, "exit+");
-		strcat(tempMessage, key);						   // Send exit message with key
-		tempMessage[strlen("exit+") + strlen(key)] = '\0'; // Null terminate the final message
+	while (1) {
+		int bytesReceived = recv(socket_desc, client_message, sizeof(client_message), 0);
+		if (bytesReceived <= 0) {
+			printf("ERROR: Failed to receive certificate chain file data.\n");
+			break;
+		}
+		// Check for end of transfer signal
+		if (bytesReceived >= strlen("CERT_CHAIN_TRANSFER_END") &&
+			memcmp(client_message, "CERT_CHAIN_TRANSFER_END", strlen("CERT_CHAIN_TRANSFER_END")) == 0) {
+			break;
+		}
+		fwrite(client_message, 1, bytesReceived, tempFile);
 	}
 
-	char hexMessage[201];						  // 2 hex digits per character + null terminator
-	memset(hexMessage, '\0', sizeof(hexMessage)); // Clear the buffer
+	fclose(tempFile);
+	printf("INFO: Certificate chain file saved to temp_cert_chain_file.txt\n");
+	printf("Done \n");
+	return;
+}
 
-	for (int i = 0; i < strlen(tempMessage); i++)
-	{
-		char tempHex[3];										 // 2 hex digits + null terminator
-		sprintf(tempHex, "%02X", (unsigned char)tempMessage[i]); // Convert next character to hex
+void receiveCRLFile(int socket_desc) {
+	// Acknowledge the CRL transfer request
+	send(socket_desc, "CRL_TRANSFER_ACK", strlen("CRL_TRANSFER_ACK"), 0);
 
-		SDES(tempHex, key, tempHex);
+	char client_message[1024];
+	memset(client_message, '\0', sizeof(client_message));
 
-		strcat(hexMessage, tempHex); // Append the encrypted hex to the final message
+	printf("INFO: Receiving CRL file from client...\n");
+
+	FILE *tempFile = fopen("SV_temp_crl_file.txt", "wb");
+	if (!tempFile) {
+		printf("ERROR: Cannot open temp CRL file for writing.\n");
+		return;
 	}
 
-	strcpy(client_message, hexMessage); // Copy the encrypted hex message to client_message
-	printf("INFO: Encrypted message to be sent: %s\n\n", client_message);
+	while (1) {
+		int bytesReceived = recv(socket_desc, client_message, sizeof(client_message), 0);
+		if (bytesReceived <= 0) {
+			printf("ERROR: Failed to receive CRL file data.\n");
+			break;
+		}
+		// Check for end of transfer signal
+		if (bytesReceived >= strlen("CRL_TRANSFER_END") &&
+			memcmp(client_message, "CRL_TRANSFER_END", strlen("CRL_TRANSFER_END")) == 0) {
+			break;
+		}
+		fwrite(client_message, 1, bytesReceived, tempFile);
+	}
+
+	fclose(tempFile);
+	printf("INFO: CRL file saved to SV_temp_crl_file.txt\n");
+	printf("Done \n");
+	return;
 }
