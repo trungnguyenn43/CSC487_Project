@@ -33,7 +33,6 @@ struct crlInfo {
     time_t thisUpdate;
     time_t nextUpdate;
     int numEntries = 0;
-    unsigned int privateKey;
     unsigned int publicKey;
     unsigned int n;
 };
@@ -55,3 +54,6 @@ void addCRLEntry(crlEntry [], int *);
 void rmCRLEntry(crlEntry [], int *, const char []);
 
 crlInfo newCRLFile(char [], unsigned int , unsigned int , unsigned int );
+
+void createCertChain(unsigned int, unsigned int, unsigned int);
+

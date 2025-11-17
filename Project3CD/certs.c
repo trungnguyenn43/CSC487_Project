@@ -99,6 +99,7 @@ void certGen(unsigned int privateKey, unsigned int publicKey, unsigned int n)
     printf("=================================\n\n");
 }
 
+
 int certVerify(const crlEntry entryList[], int numEntries)
 {
     certInfo cert;
@@ -174,6 +175,7 @@ int certVerify(const crlEntry entryList[], int numEntries)
     printf("=================================\n\n");
     return 1;
 }
+
 
 void signFile(char fileName[], unsigned int privateKey, unsigned int publicKey, unsigned int n)
 {
@@ -502,4 +504,70 @@ crlInfo newCRLFile(char crlFileName[], unsigned int privateKey, unsigned int pub
     printf("New CRL file %s created and signed successfully.\n", crlFileName);
     printf("=================================\n\n");
     return newCRL;
+}
+
+void createCertChain(unsigned int privateKey, unsigned int publicKey, unsigned int n)
+{
+    int numCerts = 0;
+    char inputBuffer[256];
+    char chainFileName[100];
+
+    printf("Enter output certificate chain file name: ");
+    fgets(chainFileName, sizeof(chainFileName), stdin);
+    chainFileName[strcspn(chainFileName, "\n")] = 0;
+
+    printf("Enter number of certificates in the chain: ");
+    fgets(inputBuffer, sizeof(inputBuffer), stdin);
+    if (sscanf(inputBuffer, "%d", &numCerts) != 1 || numCerts <= 0) {
+        printf("Invalid number. Aborting chain creation.\n");
+        return;
+    }
+
+    FILE *chainFile = fopen(chainFileName, "w");
+    if (!chainFile) {
+        printf("Error opening chain file for writing.\n");
+        return;
+    }
+
+    for (int i = 0; i < numCerts; i++) {
+        char certFileName[256];
+        printf("\nEnter certificate file name #%d: ", i + 1);
+        fgets(certFileName, sizeof(certFileName), stdin);
+        certFileName[strcspn(certFileName, "\n")] = 0;
+
+        // Verify signature before adding
+        if (verifyFileSignature(certFileName) != 1) {
+            printf("Certificate %s signature is invalid. Skipping.\n", certFileName);
+            continue;
+        }
+
+        // Append certificate content to chain file
+        FILE *certFile = fopen(certFileName, "r");
+        if (!certFile) {
+            printf("Error opening certificate file %s for reading. Skipping.\n", certFileName);
+            continue;
+        }
+
+        fprintf(chainFile, "-----BEGIN CERTIFICATE-----\n");
+        while (fgets(inputBuffer, sizeof(inputBuffer), certFile) != NULL) {
+            // Avoid duplicate BEGIN/END markers if present in cert file
+            if (strncmp(inputBuffer, "-----BEGIN CERTIFICATE-----", 27) == 0 ||
+                strncmp(inputBuffer, "-----END CERTIFICATE-----", 25) == 0) {
+                continue;
+            }
+            fputs(inputBuffer, chainFile);
+        }
+        fprintf(chainFile, "-----END CERTIFICATE-----\n\n");
+        fclose(certFile);
+
+        printf("Certificate %s added to chain.\n", certFileName);
+    }
+
+    fclose(chainFile);
+
+    // Sign the chain file
+    signFile(chainFileName, privateKey, publicKey, n);
+
+    printf("Certificate chain file '%s' created and signed successfully.\n", chainFileName);
+    printf("=================================\n\n");
 }
