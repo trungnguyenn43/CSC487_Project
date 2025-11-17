@@ -5,24 +5,6 @@
 
 const int VALID_DURATION_SECONDS = 24 * 60 * 60; // 1 day
 
-struct crlEntry {
-    char serialNumber[256];
-    time_t revocationDate;
-};
-
-struct crlInfo {
-    char crlFileName[256];
-    char algorithm[50];
-    char parameters[100];
-    char issuerName[100];
-    time_t thisUpdate;
-    time_t nextUpdate;
-    int numEntries = 0;
-    unsigned int privateKey;
-    unsigned int publicKey;
-    unsigned int n;
-};
-
 struct certInfo{
     char version[256];
     char serialNumber[256];
@@ -36,6 +18,23 @@ struct certInfo{
     unsigned int publicKey;
     unsigned int n;
     unsigned int signature;
+};
+
+struct crlEntry {
+    char serialNumber[256];
+    time_t revocationDate;
+};
+
+struct crlInfo {
+    char crlFileName[256];
+    char algorithm[50];
+    char parameters[100];
+    char issuerName[100];
+    time_t thisUpdate;
+    time_t nextUpdate;
+    int numEntries = 0;
+    unsigned int publicKey;
+    unsigned int n;
 };
 
 void certGen(unsigned int , unsigned int, unsigned int );
@@ -55,3 +54,6 @@ void addCRLEntry(crlEntry [], int *);
 void rmCRLEntry(crlEntry [], int *, const char []);
 
 crlInfo newCRLFile(char [], unsigned int , unsigned int , unsigned int );
+
+void createCertChain(unsigned int, unsigned int, unsigned int);
+
