@@ -1,4 +1,3 @@
-
 #include "DiffHellman.h"
 
 #include <stdio.h>
@@ -19,7 +18,7 @@ int DiffHellman_GenPublicKey(int *exp, int* alpha, int *prime)
         return -1; // Error in getting prime and primitive root
     }
 
-    if(*exp == -1){
+    if(*exp == 0){
         // Random integer in the range [1, prime-1]
         *exp = rand() % (*prime - 2) + 1;
     }
@@ -82,33 +81,30 @@ void getRandomPrime(int *prime, int *primitiveRoot)
 int modExp(int base, int exp, const int mod)
 {
 
-    // c - current expo
-    // f - final result
-    // a - base
-    // m - mod
-
     int result = 1; // Initialize result
-    int currentExpo = 0;
+    base = base % mod; // Ensure base is within mod range
 
-    // convert base to binary
-    int binaryExp[32]; // assuming exp is a 32-bit integer
-    int index = 0;
+    if (base == 0) return 0; // If base is divisible by mod, result is 0
+
     while (exp > 0)
     {
-        binaryExp[index++] = exp % 2;
+        // If the current bit of exp is 1, multiply result with base
+        if (exp % 2 == 1)
+        {
+            result = (result * base) % mod;
+        }
+
+        // Square the base and reduce it modulo mod
+        base = (base * base) % mod;
+
+        // Right shift exp by 1 bit (equivalent to dividing by 2)
         exp = exp / 2;
     }
 
-    // Perform modular exponentiation using the binary representation
-    for (int i = index - 1; i >= 0; i--)
+    // Ensure result is non-negative
+    if (result < 0)
     {
-        currentExpo = 2 * currentExpo;
-        result = (result * result) % mod; // Square the result
-        if (binaryExp[i] == 1)
-        {
-            currentExpo = currentExpo + 1;
-            result = (result * base) % mod; // Multiply by base if the bit is 1
-        }
+        result += mod;
     }
 
     return result;
