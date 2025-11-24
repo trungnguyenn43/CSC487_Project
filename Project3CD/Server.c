@@ -18,15 +18,21 @@
 void correctKeyLength(const int, char[4]);
 int clientRequest(char [100]);
 void receiveCertFile(int);
-void receiveCertChainFile(int);
 void receiveCRLFile(int);
+
+//Chain functions
+void receiveCertChainFile(int, const crlEntry[], const int);
+void chainVerify(int, char *, const crlEntry[], const int);
+int verifyCertInChain(certInfo, const crlEntry[], const int);
+int getCertsInChain(certInfo [], int *);
 
 // Define server port
 const int SERVER_PORT = 49152; // Port number of the server
 static char CBC_Hash_KEY[4] = "CCB"; //key for CBC Hash
 static char CBC_IV[3] = "1A"; // IV for CBC Hash
-const char CRL_FILE_NAME[] = "crl_list.txt";
-
+const char CRL_FILE_NAME[] = "SV_temp_crl_file.txt";
+unsigned int rsa_public_key = 0, rsa_private_key = 0;
+unsigned int p, q, n, totient_n;
 
 int main(int argc, char *argv[])
 {	
@@ -38,15 +44,16 @@ int main(int argc, char *argv[])
 	//====================================
 	// RSA Key GEN
 	//====================================
-	unsigned int rsa_public_key = 0, rsa_private_key = 0;
-	unsigned int p, q, n, totient_n;
+	
 
 	//getting two distinct prime numbers
 	do{
-		printf("Enter two distinct prime numbers (p and q): ");
-		scanf("%u %u", &p, &q);
+		// printf("Enter two distinct prime numbers (p and q): ");
+		// scanf("%u %u", &p, &q);
+		q = 61;
+		p = 53;
 		printf("Checking if p and q are coprime...\n");
-		getchar(); // clear newline character from input buffer
+		// getchar(); // clear newline character from input buffer
 
 		//checking if both numbers are prime
 		if(isPrime(p) == false || isPrime(q) == false){
@@ -123,7 +130,7 @@ int main(int argc, char *argv[])
 	if(recv(new_socket, client_message, 100, 0) < 0)
 	{
 		printf("ERROR: receive failed during RSA key exchange. Exiting...\n");
-		close(new_socket);
+		close(socket_desc);
 		return 1;
 	}
 	int client_rsa_public_key, client_n;
@@ -140,7 +147,7 @@ int main(int argc, char *argv[])
 	if (SYM_publicKey == -1)
 	{
 		printf("ERROR: Unable to generate public key. Exiting...\n");
-		close(new_socket);
+		close(socket_desc);
 		return 1;
 	}
     printf("INFO: Using alpha: %d\n", alpha);
@@ -179,7 +186,7 @@ int main(int argc, char *argv[])
 	if ((read_size = recv(new_socket, client_message, 100, 0)) < 0)
 	{
 		printf("ERROR: receive failed");
-		close(new_socket);
+		close(socket_desc);
 		return 1;
 	}
 
@@ -202,7 +209,7 @@ int main(int argc, char *argv[])
 
 	if(decryptedHash != hashValue){
 		printf("WARNING: RSA signature verification failed! Be cautious...\n");
-		close(new_socket);
+		close(socket_desc);
 		return 1;
 	} else {
 		printf("INFO: RSA signature verification succeeded. Continuing...\n");
@@ -219,6 +226,18 @@ int main(int argc, char *argv[])
 	printf("INFO: Using SDES with shared key: %s\n", key);
 
 	memset(client_message, '\0', 100); // Clear the buffer
+
+	// CRL Load
+	crlInfo crlFileInfo;
+	strcpy(crlFileInfo.crlFileName, CRL_FILE_NAME);
+
+	crlEntry crlEntries[100];
+	printf("========= CRL LOAD ==========\n");
+	if(loadCRLEntry(&crlFileInfo, crlEntries, rsa_private_key, rsa_public_key, n) != 1){
+        printf("Load CRL entries failed. Exiting program!\n");
+		close(socket_desc);
+        return -1;
+    }
 
 	// Server will start receive first
 	printf("\n===== MESSAGE EXCHANGE SESSION =====\n");
@@ -239,16 +258,23 @@ int main(int argc, char *argv[])
 				break;
 			case 2:
 				printf("INFO: Client requested certificate chain transfer.\n");
-				receiveCertChainFile(new_socket);
+				receiveCertChainFile(new_socket, crlEntries, crlFileInfo.numEntries);
 				break;
 			case 3:
 				printf("INFO: Client requested CRL transfer.\n");
 				receiveCRLFile(new_socket);
+				
+				// Reload CRL entries
+				//reset crl entries
+				memset(crlEntries, 0, sizeof(crlEntries));
+				crlFileInfo.numEntries = 0;
+				loadCRLEntry(&crlFileInfo, crlEntries, rsa_private_key, rsa_public_key, n);
 				break;
 			default:
 				printf("WARNING: Unknown request from client: %s\n", client_message);
 				break;
 		}
+
 		if(isExit){
 			break;
 		}
@@ -259,7 +285,6 @@ int main(int argc, char *argv[])
 	memset(client_message, '\0', 100); // Clear the buffer
 
 	// Free the socket pointer
-	close(new_socket);
 	close(socket_desc);
 	return 0;
 }
@@ -288,7 +313,7 @@ int clientRequest(char inputMessage[100]){
 	{
 		requestType = 3;
 	}
-	else if(strncmp(inputMessage, "EXIT", strlen("EXIT")) == 0)
+	else if(strncmp(inputMessage, "EXIT_RQ", strlen("EXIT_RQ")) == 0)
 	{
 		requestType = 0; // exit request
 	}
@@ -333,42 +358,6 @@ void receiveCertFile(int socket_desc) {
 	return;
 }
 
-void receiveCertChainFile(int socket_desc) {
-	
-	// Acknowledge the chain transfer request
-	send(socket_desc, "CERT_CHAIN_TRANSFER_ACK", strlen("CERT_CHAIN_TRANSFER_ACK"), 0);
-
-	char client_message[1024];
-	memset(client_message, '\0', sizeof(client_message));
-
-	printf("INFO: Receiving certificate chain file from client...\n");
-
-	FILE *tempFile = fopen("SV_temp_chain_file.txt", "wb");
-	if (!tempFile) {
-		printf("ERROR: Cannot open temp chain file for writing.\n");
-		return;
-	}
-
-	while (1) {
-		int bytesReceived = recv(socket_desc, client_message, sizeof(client_message), 0);
-		if (bytesReceived <= 0) {
-			printf("ERROR: Failed to receive certificate chain file data.\n");
-			break;
-		}
-		// Check for end of transfer signal
-		if (bytesReceived >= strlen("CERT_CHAIN_TRANSFER_END") &&
-			memcmp(client_message, "CERT_CHAIN_TRANSFER_END", strlen("CERT_CHAIN_TRANSFER_END")) == 0) {
-			break;
-		}
-		fwrite(client_message, 1, bytesReceived, tempFile);
-	}
-
-	fclose(tempFile);
-	printf("INFO: Certificate chain file saved to temp_cert_chain_file.txt\n");
-	printf("Done \n");
-	return;
-}
-
 void receiveCRLFile(int socket_desc) {
 	// Acknowledge the CRL transfer request
 	send(socket_desc, "CRL_TRANSFER_ACK", strlen("CRL_TRANSFER_ACK"), 0);
@@ -399,7 +388,327 @@ void receiveCRLFile(int socket_desc) {
 	}
 
 	fclose(tempFile);
+
 	printf("INFO: CRL file saved to SV_temp_crl_file.txt\n");
 	printf("Done \n");
+
 	return;
+}
+
+void receiveCertChainFile(int socket_desc, const crlEntry crlEntries[], const int numCrlEntries) {
+	
+	// Acknowledge the chain transfer request
+	send(socket_desc, "CERT_CHAIN_TRANSFER_ACK", strlen("CERT_CHAIN_TRANSFER_ACK"), 0);
+
+	char client_message[4096];
+	memset(client_message, '\0', sizeof(client_message));
+
+	printf("INFO: Receiving certificate chain file from client...\n");
+
+	FILE *tempFile = fopen("SV_temp_chain_file.txt", "wb");
+	if (!tempFile) {
+		printf("ERROR: Cannot open temp chain file for writing.\n");
+		return;
+	}
+
+	// Get the chain file data
+	while (1) {
+		int bytesReceived = recv(socket_desc, client_message, sizeof(client_message), 0);
+		if (bytesReceived <= 0) {
+			printf("ERROR: Failed to receive certificate chain file data.\n");
+			fclose(tempFile);
+			return;
+		}
+		// Check for end of transfer signal
+		if (bytesReceived >= strlen("CERT_CHAIN_TRANSFER_END") &&
+			memcmp(client_message, "CERT_CHAIN_TRANSFER_END", strlen("CERT_CHAIN_TRANSFER_END")) == 0) {
+			break;
+		}
+		fwrite(client_message, 1, bytesReceived, tempFile);
+	}
+
+	fclose(tempFile);
+	printf("INFO: Certificate chain file saved to SV_temp_chain_file.txt\n");
+	printf("Done\n");
+
+	// Verify the certificate chain
+	chainVerify(socket_desc, "SV_temp_chain_file.txt", crlEntries, numCrlEntries);
+
+	return;
+}
+
+int getCertsInChain(certInfo certs[], int *certCount) {
+	//load certs from temp chain file
+	FILE *chainFile = fopen("SV_temp_chain_file.txt", "r");
+	if (!chainFile) {
+		printf("ERROR: Cannot open certificate chain file for validation.\n");
+		return -1;
+	}
+
+	*certCount = 0;
+
+	// read begin chain line
+	char inputBuffer[256];
+	fgets(inputBuffer, sizeof(inputBuffer), chainFile); // Read "-----BEGIN CERTIFICATE CHAIN-----"
+
+	while(fgets(inputBuffer, sizeof(inputBuffer), chainFile) != NULL) {
+		if (strncmp(inputBuffer, "-----BEGIN CERTIFICATE-----", 27) == 0) {
+			// Start reading a certificate
+			certInfo cert;
+			// Read certificate details
+			fgets(inputBuffer, sizeof(inputBuffer), chainFile);
+			sscanf(inputBuffer, "Version: %s", cert.version);
+			fgets(inputBuffer, sizeof(inputBuffer), chainFile);
+			sscanf(inputBuffer, "Certificate Serial Number: %s", cert.serialNumber);
+			fgets(inputBuffer, sizeof(inputBuffer), chainFile);
+			sscanf(inputBuffer, "Level of Trust: %d", &cert.levelOfTrust);
+			fgets(inputBuffer, sizeof(inputBuffer), chainFile);
+			sscanf(inputBuffer, "Algorithm: %s", cert.algorithm);
+			fgets(inputBuffer, sizeof(inputBuffer), chainFile);
+			sscanf(inputBuffer, "Parameters: %s", cert.parameters);
+			fgets(inputBuffer, sizeof(inputBuffer), chainFile);
+			sscanf(inputBuffer, "Issuer Name: %s", cert.issuerName);
+			fgets(inputBuffer, sizeof(inputBuffer), chainFile);
+			sscanf(inputBuffer, "Not Before: %ld", &cert.notBefore);
+			fgets(inputBuffer, sizeof(inputBuffer), chainFile);
+			sscanf(inputBuffer, "Not After: %ld", &cert.notAfter);
+			fgets(inputBuffer, sizeof(inputBuffer), chainFile);
+			sscanf(inputBuffer, "Subject Name: %s", cert.subjectName);
+
+			fgets(inputBuffer, sizeof(inputBuffer), chainFile); //skip line
+
+			fgets(inputBuffer, sizeof(inputBuffer), chainFile);
+			sscanf(inputBuffer, "Public Key: %u %u", &cert.publicKey, &cert.n);
+			fgets(inputBuffer, sizeof(inputBuffer), chainFile);
+			sscanf(inputBuffer, "Signature: %u", &cert.signature);
+
+			certs[*certCount] = cert;
+			(*certCount)++;
+
+			// Read until end of certificate
+			while (fgets(inputBuffer, sizeof(inputBuffer), chainFile) != NULL) {
+				if (strncmp(inputBuffer, "-----END CERTIFICATE-----", 25) == 0) {
+					break;
+				}
+			}
+		}
+		else if (strncmp(inputBuffer, "-----END CERTIFICATE CHAIN-----", 30) == 0) {
+			// End of chain
+			break;
+		}
+	}
+
+	fclose(chainFile);
+	return 0;
+}
+
+// chainValidate.
+// Return minimum trust level if valid,
+// -1 if invalid cert, -2 if error opening file
+void chainVerify(int socket_desc, char *crlFileName, const crlEntry crlEntries[], const int numCrlEntries) {
+	certInfo certs[30];
+	int certCount = 0;
+	char client_message[1024];
+
+	// Load certificates from chain file
+	if(getCertsInChain(certs, &certCount) == -1){
+		sprintf(client_message, "ERROR: Unable to open certificate chain file for verification.\n");
+		send(socket_desc, client_message, strlen(client_message), 0);
+		return;
+	}
+
+
+	// Root trusted issuer list (always trusted)
+	const char* ROOT_TRUSTED_CA[] = {"Norman"};
+	const int ROOT_TRUSTED_CA_COUNT = sizeof(ROOT_TRUSTED_CA) / sizeof(ROOT_TRUSTED_CA[0]);
+
+	char trustedIssuerNames[30][100] = {'\0'};
+	int trustedIssuerCount = 0;
+	bool certValid[30] = {false};
+
+	//intialize trustedIssuerNames with root trusted issuers
+	for(int i = 0; i < ROOT_TRUSTED_CA_COUNT; i++) {
+		strcpy(trustedIssuerNames[trustedIssuerCount], ROOT_TRUSTED_CA[i]);
+		trustedIssuerCount++;
+	}
+
+	// First, check validity for all certs and get subject names
+	for(int i = 0; i < certCount; i++) {
+		int result = verifyCertInChain(certs[i], crlEntries, numCrlEntries);
+		if (result == 1) {
+			certValid[i] = true;
+		}
+		else {
+			certValid[i] = false;
+		}
+	}
+
+	// Get subject names and check if they are trusted by root (root trusted issuers)
+	for(int i = 0; i < certCount; i++) {
+		if(certValid[i] == false){
+			continue; // skip invalid certs
+		}
+
+		// Check if issuer is in ROOT_TRUSTED_CA
+		for(int j = 0; j < ROOT_TRUSTED_CA_COUNT; j++) {
+			if(strcmp(certs[i].issuerName, ROOT_TRUSTED_CA[j]) == 0) {
+				// Issuer is trusted, check if subject is already in the trusted list
+				bool alreadyTrusted = false;
+				for(int k = 0; k < trustedIssuerCount; k++) {
+					if(strcmp(trustedIssuerNames[k], certs[i].subjectName) == 0) {
+						alreadyTrusted = true;
+						break;
+					}
+				}
+				if(!alreadyTrusted) {
+					strcpy(trustedIssuerNames[trustedIssuerCount], certs[i].subjectName);
+					trustedIssuerCount++;
+				}
+				break;
+			}
+		}
+	}
+
+	// 2. check if issuers are trusted, if yes, add subject to trusted list
+	bool addedNewTrusted = false;
+	while(true) {
+		addedNewTrusted = false;
+		for(int i = 0; i < certCount; i++) {
+			if(certValid[i] == false){
+				continue; // skip invalid certs
+			}
+
+			// Check if issuer is in trustedIssuerNames
+			bool isIssuerTrusted = false;
+			for(int j = 0; j < trustedIssuerCount; j++) {
+				if(strcmp(certs[i].issuerName, trustedIssuerNames[j]) == 0) {
+					isIssuerTrusted = true;
+					break;
+				}
+			}
+
+			if(isIssuerTrusted) {
+				// Issuer is trusted, check if subject is already in the trusted list
+				bool alreadyTrusted = false;
+				for(int k = 0; k < trustedIssuerCount; k++) {
+					if(strcmp(trustedIssuerNames[k], certs[i].subjectName) == 0) {
+						alreadyTrusted = true;
+						break;
+					}
+				}
+				if(!alreadyTrusted) {
+					strcpy(trustedIssuerNames[trustedIssuerCount], certs[i].subjectName);
+					trustedIssuerCount++;
+					addedNewTrusted = true;
+				}
+			}
+		}
+		if(!addedNewTrusted) {
+			break; // No new trusted issuers added, exit loop
+		}
+	}
+
+
+	int trustLevel = -1;
+	int chainBreakPoint = -1;
+	// 3. check if all certs are trusted
+	for(int i = 0; i < certCount; i++) {
+		if(certValid[i] == false){
+			continue; // skip invalid certs
+		}
+
+		// Check if issuer is in trustedIssuerNames
+		bool isTrusted = false;
+		for(int j = 0; j < trustedIssuerCount; j++) {
+			if(strcmp(certs[i].issuerName, trustedIssuerNames[j]) == 0) {
+				isTrusted = true;
+				break;
+			}
+		}
+
+		if(!isTrusted) {
+			chainBreakPoint = i;
+			continue;
+		} else {
+			// Update trust level
+			if(trustLevel == -1 || certs[i].levelOfTrust < trustLevel) {
+				trustLevel = certs[i].levelOfTrust;
+			}
+		}
+	}
+
+	// If there is a break point, report failure
+	if(chainBreakPoint != -1){
+		sprintf(client_message, 
+			"Unable to verify complete chain. Chain verified to %s with a chain TL of %d. No cert available for %s\n", 
+			certs[chainBreakPoint].issuerName
+			, trustLevel, 
+			certs[chainBreakPoint].issuerName);
+		send(socket_desc, client_message, strlen(client_message), 0);
+		return;
+	}
+	
+	// If all certs are valid and trusted, report success and show trusted subjects
+	sprintf(client_message, "Certificate chain verified successfully. Chain Trust Level: %d\n", trustLevel);
+	send(socket_desc, client_message, strlen(client_message), 0);
+	return;
+}
+
+// Verify individual certificate against CRL. Return 1 if valid, 0 if invalid, -1 if error
+int verifyCertInChain(certInfo cert, const crlEntry crlEntries[], const int numCrlEntries) {
+	// Check validity period
+	time_t currentTime = time(NULL);
+	if (currentTime < cert.notBefore || currentTime > cert.notAfter) {
+		printf("ERROR: Certificate with Serial Number %s is expired or not yet valid.\n", cert.serialNumber);
+		return 0;
+	}
+
+	// Check against CRL entries
+	for (int i = 0; i < numCrlEntries; i++) {
+		if (strcmp(cert.serialNumber, crlEntries[i].serialNumber) == 0) {
+			printf("ERROR: Certificate with Serial Number %s is revoked.\n", cert.serialNumber);
+			return -1;
+		}
+	}
+
+	//check signature
+	// Hash using CTR CBC
+	char tempOutputBuffer[1024];
+	snprintf(tempOutputBuffer, sizeof(tempOutputBuffer),
+		"Version: %s\n"
+		"Certificate Serial Number: %s\n"
+		"Level of Trust: %d\n"
+		"Algorithm: %s\n"
+		"Parameters: %s\n"
+		"Issuer Name: %s\n"
+		"Not Before: %ld\n"
+		"Not After: %ld\n"
+		"Subject Name: %s\n\n"
+		"Public Key: %u %u\n",
+		cert.version,
+		cert.serialNumber,
+		cert.levelOfTrust,
+		cert.algorithm,
+		cert.parameters,
+		cert.issuerName,
+		cert.notBefore,
+		cert.notAfter,
+		cert.subjectName,
+		cert.publicKey,
+		cert.n
+	);
+
+	char computedHash[3];
+	CBCHash(tempOutputBuffer, CBC_IV, CBC_Hash_KEY, computedHash);
+	// Convert hash to numeric value
+	unsigned int hashValue = (unsigned int)strtol(computedHash, NULL, 16); // convert hash to integer
+	
+	unsigned int decryptedSignature = modExp(cert.signature, cert.publicKey, cert.n);
+
+	if(decryptedSignature != hashValue){
+		printf("ERROR: Certificate with Serial Number %s has invalid signature.\n", cert.serialNumber);
+		return 0;
+	}
+
+	return 1; // Certificate is valid
 }

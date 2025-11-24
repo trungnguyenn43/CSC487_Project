@@ -223,6 +223,7 @@ void signFile(char fileName[], unsigned int privateKey, unsigned int publicKey, 
     fclose(certFile);
 }
 
+// Return 1 if valid, 0 if invalid, -1 if error
 int verifyFileSignature(char fileName[])
 {
     char inputBuffer[256];
@@ -243,9 +244,9 @@ int verifyFileSignature(char fileName[])
         return -1;
     }
 
-    char fileContent[1024];
+    char fileContent[2048];
     memset(fileContent, '\0', sizeof(fileContent));
-
+    
     fseek(certFile, 0, SEEK_SET); // move pointer to beginning of file
 
     while (fgets(inputBuffer, sizeof(inputBuffer), certFile) != NULL)
@@ -529,6 +530,8 @@ void createCertChain(unsigned int privateKey, unsigned int publicKey, unsigned i
         return;
     }
 
+    fprintf(chainFile, "-----BEGIN CERTIFICATE CHAIN-----\n\n");
+
     for (int i = 0; i < numCerts; i++) {
         char certFileName[256];
         printf("\nEnter certificate file name #%d: ", i + 1);
@@ -563,11 +566,9 @@ void createCertChain(unsigned int privateKey, unsigned int publicKey, unsigned i
         printf("Certificate %s added to chain.\n", certFileName);
     }
 
+    fprintf(chainFile, "-----END CERTIFICATE CHAIN-----\n");
     fclose(chainFile);
 
-    // Sign the chain file
-    signFile(chainFileName, privateKey, publicKey, n);
-
-    printf("Certificate chain file '%s' created and signed successfully.\n", chainFileName);
+    printf("Certificate chain file '%s' created!\n", chainFileName);
     printf("=================================\n\n");
 }

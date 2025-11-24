@@ -27,6 +27,9 @@ static char SERVER_ADDR[26] = "10.0.0.2"; // IP address of the server by default
 int SERVER_PORT = 49152;				  // Port number of the server by default
 static char CBC_Hash_KEY[4] = "CCB"; //key for CBC Hash
 static char CBC_IV[3] = "1A"; // IV for CBC Hash
+const char CRL_FILE_NAME[] = "crl.txt";
+unsigned int rsa_public_key = 0, rsa_private_key = 0;
+unsigned int p, q, n, totient_n;
 
 void correctKeyLength(const int, char[4]);
 int getAction();
@@ -43,15 +46,16 @@ int main(int argc, char *argv[])
 	//================
 	// RSA Key Gen
 	//================
-	unsigned int rsa_public_key = 0, rsa_private_key = 0;
-	unsigned int p, q, n, totient_n;
+	
 
 	//getting two distinct prime numbers
 	do{
-		printf("Enter two distinct prime numbers (p and q): ");
-		scanf("%u %u", &p, &q);
+		// printf("Enter two distinct prime numbers (p and q): ");
+		// scanf("%u %u", &p, &q);
+		p = 53;
+		q = 11;
 		printf("Checking if p and q are co-prime...\n");
-		getchar(); // clear newline character from input buffer
+		// getchar(); // clear newline character from input buffer
 
 		//checking if both numbers are prime
 		if(isPrime(p) == false || isPrime(q) == false){
@@ -261,6 +265,20 @@ int main(int argc, char *argv[])
 	bool isExit = false;
 	memset(client_message, '\0', 100); // Clear the buffer
 
+	// CRL Load
+	crlInfo crlFileInfo;
+	strcpy(crlFileInfo.crlFileName, CRL_FILE_NAME);
+
+	crlEntry crlEntries[100];
+	printf("========= CRL LOAD ==========\n");
+	if(loadCRLEntry(&crlFileInfo, crlEntries, rsa_private_key, rsa_public_key, n) != 1){
+        printf("Load CRL entries failed. Exiting program!\n");
+		close(socket_desc);
+        return -1;
+    }
+
+
+	// MESSAGE SESSION
 
 	while (!isExit)
 	{
@@ -278,20 +296,30 @@ int main(int argc, char *argv[])
 			case 4:
 				sendCertChainToServer(socket_desc, key);
 				break;
-			case 5: {
-				char crlFileName[256];
-				printf("Enter new CRL file name: ");
-				fgets(crlFileName, sizeof(crlFileName), stdin);
-				crlFileName[strcspn(crlFileName, "\n")] = 0;
-				newCRLFile(crlFileName, rsa_private_key, rsa_public_key, n);
+			case 5: 
+				newCRLFile(crlFileInfo.crlFileName, rsa_private_key, rsa_public_key, n);
 				break;
-			}
+			
 			case 6:
+				addCRLEntry(crlEntries, &crlFileInfo.numEntries);
+				saveCRL(&crlFileInfo, crlEntries, rsa_private_key, rsa_public_key, n);
+				break;
+			
+			case 7:
+				printf("Enter Certificate Serial Number to remove from CRL: ");
+				fgets(inputBuffer, sizeof(inputBuffer), stdin);
+				// remove newline character from fgets
+				inputBuffer[strcspn(inputBuffer, "\n")] = 0;
+				rmCRLEntry(crlEntries, &crlFileInfo.numEntries, inputBuffer);
+				saveCRL(&crlFileInfo, crlEntries, rsa_private_key, rsa_public_key, n);
+				break;
+			
+			case 8:
 				sendCRLToServer(socket_desc);
 				break;
-			case 7:
+			case 9:
 				isExit = true;
-				send(socket_desc, "EXIT", strlen("EXIT"), 0);
+				send(socket_desc, "EXIT_RQ", strlen("EXIT_RQ"), 0);
 				printf("Exiting program...\n");
 				break;
 			default:
@@ -300,6 +328,8 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	// Free the socket pointer
+	close(socket_desc);
 	return 0;
 }
 
@@ -321,8 +351,10 @@ int getAction(){
 	printf("3. Create chain of certs\n");
 	printf("4. Send chain of certs to server\n");
 	printf("5. Create new CRL file\n");
-	printf("6. Send CRL to server\n");
-	printf("7. Exit\n");
+	printf("6. Add revoked cert\n");
+	printf("7. Remove revoked cert\n");
+	printf("8. Send CRL to server\n");
+	printf("9. Exit\n");
 	printf("Enter your choice: ");
 
 	fgets(inputBuffer, sizeof(inputBuffer), stdin);
@@ -341,6 +373,13 @@ void sendCertToServer(int socket_desc, char key[4]){
 	printf("Enter certificate file name to send to server (e.g., cert.txt): ");
 	fgets(certFileName, sizeof(certFileName), stdin);
 	certFileName[strcspn(certFileName, "\n")] = 0; // Remove newline character
+
+	// Open cert file to send its contents to server
+	FILE *certFile = fopen(certFileName, "rb");
+	if (!certFile) {
+		printf("ERROR: Cannot open certificate file '%s'.\n", certFileName);
+		return;
+	}
 
 	// Notify server about certificate transfer
 	send(socket_desc, "CERT_TRANSFER", strlen("CERT_TRANSFER"), 0);
@@ -361,12 +400,7 @@ void sendCertToServer(int socket_desc, char key[4]){
 
 	printf("INFO: Sending certificate file '%s' to server...\n", certFileName);
 
-	// Open cert file and send its contents to server
-	FILE *certFile = fopen(certFileName, "rb");
-	if (!certFile) {
-		printf("ERROR: Cannot open certificate file '%s'.\n", certFileName);
-		return;
-	}
+	
 
 	char buffer[1024];
 	size_t bytesRead;
@@ -393,30 +427,33 @@ void sendCertChainToServer(int socket_desc, char key[4]) {
 	fgets(chainFileName, sizeof(chainFileName), stdin);
 	chainFileName[strcspn(chainFileName, "\n")] = 0; // Remove newline
 
-	// Notify server about chain transfer
-	send(socket_desc, "CERT_CHAIN_TRANSFER", strlen("CERT_CHAIN_TRANSFER"), 0);
-
-	// Wait for ACK from server
-	char server_reply[100];
-	memset(server_reply, '\0', 100);
-	if (recv(socket_desc, server_reply, 100, 0) < 0) {
-		printf("ERROR: receive failed during chain transfer. Exiting...\n");
-		return;
-	}
-	if (strncmp(server_reply, "CERT_CHAIN_TRANSFER_ACK", strlen("CERT_CHAIN_TRANSFER_ACK")) != 0) {
-		printf("ERROR: Invalid ACK from server. Exiting...\n");
-		return;
-	}
-
-	printf("INFO: Sending certificate chain file '%s' to server...\n", chainFileName);
-
 	FILE *chainFile = fopen(chainFileName, "rb");
 	if (!chainFile) {
 		printf("ERROR: Cannot open certificate chain file '%s'.\n", chainFileName);
 		return;
 	}
 
-	char buffer[1024];
+	// Notify server about chain transfer
+	send(socket_desc, "CERT_CHAIN_TRANSFER", strlen("CERT_CHAIN_TRANSFER"), 0);
+
+	// Wait for ACK from server
+	char server_reply[1024];
+	memset(server_reply, '\0', sizeof(server_reply));
+	if (recv(socket_desc, server_reply, sizeof(server_reply), 0) < 0) {
+		printf("ERROR: receive failed during chain transfer. Exiting...\n");
+		fclose(chainFile);
+		return;
+	}
+
+	if (strncmp(server_reply, "CERT_CHAIN_TRANSFER_ACK", strlen("CERT_CHAIN_TRANSFER_ACK")) != 0) {
+		printf("ERROR: Invalid ACK from server. Exiting...\n");
+		fclose(chainFile);
+		return;
+	}
+
+	printf("INFO: Sending certificate chain file '%s' to server...\n", chainFileName);
+
+	char buffer[4096];
 	size_t bytesRead;
 	while ((bytesRead = fread(buffer, 1, sizeof(buffer), chainFile)) > 0) {
 		if (send(socket_desc, buffer, bytesRead, 0) < 0) {
@@ -425,12 +462,22 @@ void sendCertChainToServer(int socket_desc, char key[4]) {
 			return;
 		}
 	}
+
 	fclose(chainFile);
 
 	// Send transfer end message
 	send(socket_desc, "CERT_CHAIN_TRANSFER_END", strlen("CERT_CHAIN_TRANSFER_END"), 0);
 
 	printf("INFO: Certificate chain file sent to server.\n");
+	printf("Done! Waiting verification result\n");
+
+	memset(server_reply, '\0', sizeof(server_reply));
+	if (recv(socket_desc, server_reply, sizeof(server_reply), 0) > 0) {
+		printf("Server response:\n%s\n", server_reply);
+	} else {
+		printf("ERROR: Failed to receive server response.\n");
+	}
+
 	return;
 }
 
@@ -440,6 +487,12 @@ void sendCRLToServer(int socket_desc) {
 	printf("Enter CRL file name to send to server (e.g., crl.txt): ");
 	fgets(crlFileName, sizeof(crlFileName), stdin);
 	crlFileName[strcspn(crlFileName, "\n")] = 0;
+
+	FILE *crlFile = fopen(crlFileName, "rb");
+	if (!crlFile) {
+		printf("ERROR: Cannot open CRL file '%s'.\n", crlFileName);
+		return;
+	}
 
 	// Notify server about CRL transfer
 	send(socket_desc, "CRL_TRANSFER", strlen("CRL_TRANSFER"), 0);
@@ -458,20 +511,10 @@ void sendCRLToServer(int socket_desc) {
 
 	printf("INFO: Sending CRL file '%s' to server...\n", crlFileName);
 
-	FILE *crlFile = fopen(crlFileName, "rb");
-	if (!crlFile) {
-		printf("ERROR: Cannot open CRL file '%s'.\n", crlFileName);
-		return;
-	}
-
 	char buffer[1024];
 	size_t bytesRead;
-	while ((bytesRead = fread(buffer, 1, sizeof(buffer), crlFile)) > 0) {
-		if (send(socket_desc, buffer, bytesRead, 0) < 0) {
-			printf("ERROR: Failed to send CRL file data.\n");
-			fclose(crlFile);
-			return;
-		}
+	while (fgets(buffer, sizeof(buffer), crlFile) != NULL) {
+		send(socket_desc, buffer, strlen(buffer), 0);
 	}
 	fclose(crlFile);
 
