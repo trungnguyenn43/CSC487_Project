@@ -10,17 +10,20 @@
 static char IV[3] = "1A";
 static char CBC_KEY[4] = "CCB";
 
-void certGen(unsigned int privateKey, unsigned int publicKey, unsigned int n)
+void certGen(char fileName[], unsigned int privateKey, unsigned int publicKey, unsigned int n)
 {
     certInfo cert;
     char inputBuffer[256];
-    char fileName[100];
+    // char fileName[100];
 
-    // file name
-    printf("Enter output certificate file name: ");
-    fgets(fileName, sizeof(fileName), stdin);
-    fileName[strcspn(fileName, "\n")] = 0;
-
+    if(strlen(fileName) == 0)
+    {
+        // file name
+        printf("Enter output certificate file name: ");
+        fgets(fileName, strlen(fileName), stdin);
+        fileName[strcspn(fileName, "\n")] = 0;
+    }
+    
     FILE *certFile = fopen(fileName, "w");
     if (certFile == NULL)
     {

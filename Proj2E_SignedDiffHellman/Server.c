@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include <fcntl.h> // For file operations
+#include <sys/stat.h> // For file permissions
 
 // Socket dependency
 #include <sys/socket.h>
@@ -218,23 +220,35 @@ int main(int argc, char *argv[])
 
 	memset(client_message, '\0', 100); // Clear the buffer
 
+	// Open a temporary file for writing
+	FILE *tempFile = fopen("server_temp_file.txt", "w");
+	if (tempFile == NULL) {
+		printf("ERROR: Unable to open temporary file for writing.\n");
+		close(new_socket);
+		return 1;
+	}
+
 	// Server will start receive first
 	printf("\n===== MESSAGE EXCHANGE SESSION =====\n");
 	printf("WAITING FOR CLIENT MESSAGE...\n");
 
-	while (!isExit)
-	{
+	while (!isExit) {
 		// Receive a message from client
-		if ((read_size = recv(new_socket, client_message, 100, 0)) > 0)
-		{
-			if (read_size == -1)
-			{
-				printf("ERROR: receive failed");
+		if ((read_size = recv(new_socket, client_message, 100, 0)) > 0) {
+			if (read_size == -1) {
+				printf("ERROR: receive failed\n");
 				isExit = true;
 				break;
 			}
 
 			printf("INFO: Client sent %d byte message:  %s\n", read_size, client_message);
+
+			// Write the received message to the temporary file
+			if (fwrite(client_message, sizeof(char), read_size, tempFile) < read_size) {
+				printf("ERROR: Failed to write to temporary file.\n");
+				isExit = true;
+				break;
+			}
 
 			decipherMessage(key, client_message, read_size, &isExit);
 
@@ -260,6 +274,9 @@ int main(int argc, char *argv[])
 			memset(client_message, '\0', 100); // Clear the buffer for next message
 		}
 	}
+
+	// Close the temporary file
+	fclose(tempFile);
 
 	// Free character arrays
 	memset(client_message, '\0', 100); // Clear the buffer

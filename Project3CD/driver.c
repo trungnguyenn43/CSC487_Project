@@ -69,7 +69,7 @@ int main() {
         strcpy(crlFileInfo.crlFileName, fileName);
     }
     if(loadCRLEntry(&crlFileInfo, crlEntries, d, e, n) != 1){
-        printf("Load CRL entries failed. Exitting program!\n");
+        printf("Load CRL entries failed. Exiting program!\n");
         return -1;
     }
     
@@ -98,6 +98,7 @@ int main() {
                 break;
             case 3:
                 addCRLEntry(crlEntries, &crlFileInfo.numEntries);
+                saveCRL(&crlFileInfo, crlEntries, d, e, n);
                 break;
             case 4:
                 printf("Enter Certificate Serial Number to remove from CRL: ");
