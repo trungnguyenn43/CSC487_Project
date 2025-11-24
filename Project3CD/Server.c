@@ -322,119 +322,156 @@ int clientRequest(char inputMessage[100]){
 }
 
 void receiveCertFile(int socket_desc) {
-
     // Acknowledge the certificate transfer request
     send(socket_desc, "CERT_TRANSFER_ACK", strlen("CERT_TRANSFER_ACK"), 0);
-	
-    char client_message[1024]; // Buffer for receiving data
+
+    char client_message[1024];
     memset(client_message, '\0', sizeof(client_message));
-	
+
     printf("INFO: Receiving certificate file from client...\n");
 
-	FILE *tempFile = fopen("SV_temp_cert_file.txt", "wb");
-	if (!tempFile) {
-		printf("ERROR: Cannot open temp file for writing.\n");
-		return;
-	}
+    FILE *tempFile = fopen("SV_temp_cert_file.txt", "w");
+    if (!tempFile) {
+        printf("ERROR: Cannot open temp file for writing.\n");
+        return;
+    }
 
-	while (1) {
-		int bytesReceived = recv(socket_desc, client_message, sizeof(client_message), 0);
-		if (bytesReceived <= 0) {
-			printf("ERROR: Failed to receive certificate file data.\n");
-			break;
-		}
-		// Check for end of transfer signal
-		if (bytesReceived >= strlen("CERT_TRANSFER_END") &&
-			memcmp(client_message, "CERT_TRANSFER_END", strlen("CERT_TRANSFER_END")) == 0) {
-			break;
-		}
-		fwrite(client_message, 1, bytesReceived, tempFile);
-	}
+    while (1) {
+        if (recv(socket_desc, client_message, sizeof(client_message), 0) <= 0) {
+            printf("ERROR: Receive failed during certificate transfer. Exiting...\n");
+            fclose(tempFile);
+            return;
+        }
 
-	fclose(tempFile);
-	printf("INFO: Certificate file saved to temp_cert_file.txt\n");
-	printf("Done \n");
+        // Check for transfer end message
+        if (strncmp(client_message, "CERT_TRANSFER_END", strlen("CERT_TRANSFER_END")) == 0) {
+            printf("INFO: Certificate transfer complete.\n");
+            break;
+        }
 
-	return;
+        // Send ACK for each line received
+        if (send(socket_desc, "CERT_LINE_ACK", strlen("CERT_LINE_ACK"), 0) < 0) {
+            printf("ERROR: Send failed during certificate transfer. Exiting...\n");
+            fclose(tempFile);
+            return;
+        }
+
+        // Write the received line to the temp file
+        if (fwrite(client_message, 1, strlen(client_message), tempFile) < strlen(client_message)) {
+            printf("ERROR: Failed to write to temporary file.\n");
+            fclose(tempFile);
+            return;
+        }
+
+        memset(client_message, '\0', sizeof(client_message)); // Clear the buffer for next line
+    }
+
+    fclose(tempFile);
+    printf("INFO: Certificate file saved to SV_temp_cert_file.txt\n");
+    return;
 }
 
 void receiveCRLFile(int socket_desc) {
-	// Acknowledge the CRL transfer request
-	send(socket_desc, "CRL_TRANSFER_ACK", strlen("CRL_TRANSFER_ACK"), 0);
+    // Acknowledge the CRL transfer request
+    send(socket_desc, "CRL_TRANSFER_ACK", strlen("CRL_TRANSFER_ACK"), 0);
 
-	char client_message[1024];
-	memset(client_message, '\0', sizeof(client_message));
+    char client_message[1024];
+    memset(client_message, '\0', sizeof(client_message));
 
-	printf("INFO: Receiving CRL file from client...\n");
+    printf("INFO: Receiving CRL file from client...\n");
 
-	FILE *tempFile = fopen("SV_temp_crl_file.txt", "wb");
-	if (!tempFile) {
-		printf("ERROR: Cannot open temp CRL file for writing.\n");
-		return;
-	}
+    FILE *tempFile = fopen("SV_temp_crl_file.txt", "w");
+    if (!tempFile) {
+        printf("ERROR: Cannot open temp CRL file for writing.\n");
+        return;
+    }
 
-	while (1) {
-		int bytesReceived = recv(socket_desc, client_message, sizeof(client_message), 0);
-		if (bytesReceived <= 0) {
-			printf("ERROR: Failed to receive CRL file data.\n");
-			break;
-		}
-		// Check for end of transfer signal
-		if (bytesReceived >= strlen("CRL_TRANSFER_END") &&
-			memcmp(client_message, "CRL_TRANSFER_END", strlen("CRL_TRANSFER_END")) == 0) {
-			break;
-		}
-		fwrite(client_message, 1, bytesReceived, tempFile);
-	}
+    while (1) {
+        if (recv(socket_desc, client_message, sizeof(client_message), 0) < 0) {
+            printf("ERROR: Receive failed during CRL transfer. Exiting...\n");
+            fclose(tempFile);
+            return;
+        }
 
-	fclose(tempFile);
+        // Check for transfer end message
+        if (strncmp(client_message, "CRL_TRANSFER_END", strlen("CRL_TRANSFER_END")) == 0) {
+            printf("INFO: CRL transfer complete.\n");
+            break;
+        }
 
-	printf("INFO: CRL file saved to SV_temp_crl_file.txt\n");
-	printf("Done \n");
+        // Send ACK for each line received
+        if (send(socket_desc, "CRL_LINE_ACK", strlen("CRL_LINE_ACK"), 0) < 0) {
+            printf("ERROR: Send failed during CRL transfer. Exiting...\n");
+            fclose(tempFile);
+            return;
+        }
 
-	return;
+        // Write the received line to the temp file
+        if (fwrite(client_message, 1, strlen(client_message), tempFile) < strlen(client_message)) {
+            printf("ERROR: Failed to write to temporary file.\n");
+            fclose(tempFile);
+            return;
+        }
+
+        memset(client_message, '\0', sizeof(client_message)); // Clear the buffer for next line
+    }
+
+    fclose(tempFile);
+    printf("INFO: CRL file saved to SV_temp_crl_file.txt\n");
+    return;
 }
 
 void receiveCertChainFile(int socket_desc, const crlEntry crlEntries[], const int numCrlEntries) {
-	
-	// Acknowledge the chain transfer request
-	send(socket_desc, "CERT_CHAIN_TRANSFER_ACK", strlen("CERT_CHAIN_TRANSFER_ACK"), 0);
+    // Acknowledge the chain transfer request
+    send(socket_desc, "CERT_CHAIN_TRANSFER_ACK", strlen("CERT_CHAIN_TRANSFER_ACK"), 0);
 
-	char client_message[4096];
-	memset(client_message, '\0', sizeof(client_message));
+    char client_message[1024];
+    memset(client_message, '\0', sizeof(client_message));
 
-	printf("INFO: Receiving certificate chain file from client...\n");
+    printf("INFO: Receiving certificate chain file from client...\n");
 
-	FILE *tempFile = fopen("SV_temp_chain_file.txt", "wb");
-	if (!tempFile) {
-		printf("ERROR: Cannot open temp chain file for writing.\n");
-		return;
-	}
+    FILE *tempFile = fopen("SV_temp_chain_file.txt", "w");
+    if (!tempFile) {
+        printf("ERROR: Cannot open temp chain file for writing.\n");
+        return;
+    }
 
-	// Get the chain file data
-	while (1) {
-		int bytesReceived = recv(socket_desc, client_message, sizeof(client_message), 0);
-		if (bytesReceived <= 0) {
-			printf("ERROR: Failed to receive certificate chain file data.\n");
-			fclose(tempFile);
-			return;
-		}
-		// Check for end of transfer signal
-		if (bytesReceived >= strlen("CERT_CHAIN_TRANSFER_END") &&
-			memcmp(client_message, "CERT_CHAIN_TRANSFER_END", strlen("CERT_CHAIN_TRANSFER_END")) == 0) {
-			break;
-		}
-		fwrite(client_message, 1, bytesReceived, tempFile);
-	}
+    while (1) {
+        if (recv(socket_desc, client_message, sizeof(client_message), 0) < 0) {
+            printf("ERROR: Receive failed during certificate chain transfer. Exiting...\n");
+            fclose(tempFile);
+            return;
+        }
 
-	fclose(tempFile);
-	printf("INFO: Certificate chain file saved to SV_temp_chain_file.txt\n");
-	printf("Done\n");
+        // Check for transfer end message
+        if (strncmp(client_message, "CERT_CHAIN_TRANSFER_END", strlen("CERT_CHAIN_TRANSFER_END")) == 0) {
+            printf("INFO: Certificate chain transfer complete.\n");
+            break;
+        }
 
-	// Verify the certificate chain
-	chainVerify(socket_desc, "SV_temp_chain_file.txt", crlEntries, numCrlEntries);
+        // Send ACK for each line received
+        if (send(socket_desc, "CERT_CHAIN_LINE_ACK", strlen("CERT_CHAIN_LINE_ACK"), 0) < 0) {
+            printf("ERROR: Send failed during certificate chain transfer. Exiting...\n");
+            fclose(tempFile);
+            return;
+        }
 
-	return;
+        // Write the received line to the temp file
+        if (fwrite(client_message, 1, strlen(client_message), tempFile) < strlen(client_message)) {
+            printf("ERROR: Failed to write to temporary file.\n");
+            fclose(tempFile);
+            return;
+        }
+
+        memset(client_message, '\0', sizeof(client_message)); // Clear the buffer for next line
+    }
+
+    fclose(tempFile);
+    printf("INFO: Certificate chain file saved to SV_temp_chain_file.txt\n");
+
+    // Verify the certificate chain
+    chainVerify(socket_desc, "SV_temp_chain_file.txt", crlEntries, numCrlEntries);
+    return;
 }
 
 int getCertsInChain(certInfo certs[], int *certCount) {

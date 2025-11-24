@@ -366,162 +366,207 @@ int getAction(){
 	return choice;
 }
 
-void sendCertToServer(int socket_desc, char key[4]){
-	
-	//getting file name
-	char certFileName[100];
-	printf("Enter certificate file name to send to server (e.g., cert.txt): ");
-	fgets(certFileName, sizeof(certFileName), stdin);
-	certFileName[strcspn(certFileName, "\n")] = 0; // Remove newline character
+void sendCertToServer(int socket_desc, char key[4]) {
+    char certFileName[100];
+    printf("Enter certificate file name to send to server (e.g., cert.txt): ");
+    fgets(certFileName, sizeof(certFileName), stdin);
+    certFileName[strcspn(certFileName, "\r\n")] = 0;
 
-	// Open cert file to send its contents to server
-	FILE *certFile = fopen(certFileName, "rb");
-	if (!certFile) {
-		printf("ERROR: Cannot open certificate file '%s'.\n", certFileName);
-		return;
-	}
+    FILE *certFile = fopen(certFileName, "r");
+    if (!certFile) {
+        printf("ERROR: Cannot open certificate file '%s'.\n", certFileName);
+        return;
+    }
 
-	// Notify server about certificate transfer
-	send(socket_desc, "CERT_TRANSFER", strlen("CERT_TRANSFER"), 0);
+    send(socket_desc, "CERT_TRANSFER", strlen("CERT_TRANSFER"), 0);
 
-	// ACK from server
-	char server_reply[100];
-	memset(server_reply, '\0', 100); // Clear the buffer
-	if (recv(socket_desc, server_reply, 100, 0) < 0)
-	{	
-		printf("ERROR: receive failed during certificate transfer. Exiting...\n");
-		return;
-	}
+    char server_reply[100];
+    memset(server_reply, '\0', sizeof(server_reply));
+    if (recv(socket_desc, server_reply, sizeof(server_reply), 0) <= 0) {
+        printf("ERROR: Receive failed during certificate transfer. Exiting...\n");
+        fclose(certFile);
+        return;
+    }
 
-	if(strncmp(server_reply, "CERT_TRANSFER_ACK", strlen("CERT_TRANSFER_ACK")) != 0){
-		printf("ERROR: Invalid ACK from server. Exiting...\n");
-		return;
-	}
+    if (strncmp(server_reply, "CERT_TRANSFER_ACK", strlen("CERT_TRANSFER_ACK")) != 0) {
+        printf("ERROR: Invalid ACK from server. Exiting...\n");
+        fclose(certFile);
+        return;
+    }
 
-	printf("INFO: Sending certificate file '%s' to server...\n", certFileName);
+    printf("INFO: Sending certificate file '%s' to server...\n", certFileName);
 
-	
+    char buffer[1024];
+    while (fgets(buffer, sizeof(buffer), certFile) != NULL) {
+        // Send each line to the server
+        if (send(socket_desc, buffer, strlen(buffer), 0) < 0) {
+            printf("ERROR: Failed to send certificate file data.\n");
+            fclose(certFile);
+            return;
+        }
 
-	char buffer[1024];
-	size_t bytesRead;
-	while ((bytesRead = fread(buffer, 1, sizeof(buffer), certFile)) > 0) {
-		if (send(socket_desc, buffer, bytesRead, 0) < 0) {
-			printf("ERROR: Failed to send certificate file data.\n");
-			fclose(certFile);
-			return;
-		}
-	}
-	fclose(certFile);
+        // Wait for ACK from server
+        memset(server_reply, '\0', sizeof(server_reply));
+        if (recv(socket_desc, server_reply, sizeof(server_reply), 0) <= 0) {
+            printf("ERROR: Failed to receive ACK from server. Exiting...\n");
+            fclose(certFile);
+            return;
+        }
 
-	// Send transfer end message
-	send(socket_desc, "CERT_TRANSFER_END", strlen("CERT_TRANSFER_END"), 0);
+        if (strncmp(server_reply, "CERT_LINE_ACK", strlen("CERT_LINE_ACK")) != 0) {
+            printf("ERROR: Invalid ACK from server. Exiting...\n");
+            fclose(certFile);
+            return;
+        }
+    }
 
-	printf("INFO: Certificate file sent to server.\n");
-	return;
+    fclose(certFile);
+
+    // Send transfer end message
+    send(socket_desc, "CERT_TRANSFER_END", strlen("CERT_TRANSFER_END"), 0);
+
+    printf("INFO: Certificate file sent to server.\n");
+    return;
 }
 
 void sendCertChainToServer(int socket_desc, char key[4]) {
-	// Get chain file name
-	char chainFileName[100];
-	printf("Enter certificate chain file name to send to server (e.g., chain.txt): ");
-	fgets(chainFileName, sizeof(chainFileName), stdin);
-	chainFileName[strcspn(chainFileName, "\n")] = 0; // Remove newline
+    // Get chain file name
+    char chainFileName[100];
+    printf("Enter certificate chain file name to send to server (e.g., chain.txt): ");
+    fgets(chainFileName, sizeof(chainFileName), stdin);
+    chainFileName[strcspn(chainFileName, "\r\n")] = 0;
 
-	FILE *chainFile = fopen(chainFileName, "rb");
-	if (!chainFile) {
-		printf("ERROR: Cannot open certificate chain file '%s'.\n", chainFileName);
-		return;
-	}
+    FILE *chainFile = fopen(chainFileName, "r");
+    if (!chainFile) {
+        printf("ERROR: Cannot open certificate chain file '%s'.\n", chainFileName);
+        return;
+    }
 
-	// Notify server about chain transfer
-	send(socket_desc, "CERT_CHAIN_TRANSFER", strlen("CERT_CHAIN_TRANSFER"), 0);
+    // Notify server about chain transfer
+    send(socket_desc, "CERT_CHAIN_TRANSFER", strlen("CERT_CHAIN_TRANSFER"), 0);
 
-	// Wait for ACK from server
-	char server_reply[1024];
-	memset(server_reply, '\0', sizeof(server_reply));
-	if (recv(socket_desc, server_reply, sizeof(server_reply), 0) < 0) {
-		printf("ERROR: receive failed during chain transfer. Exiting...\n");
-		fclose(chainFile);
-		return;
-	}
+    // Wait for ACK from server
+    char server_reply[1024];
+    memset(server_reply, '\0', sizeof(server_reply));
+    if (recv(socket_desc, server_reply, sizeof(server_reply), 0) <= 0) {
+        printf("ERROR: Receive failed during chain transfer. Exiting...\n");
+        fclose(chainFile);
+        return;
+    }
 
-	if (strncmp(server_reply, "CERT_CHAIN_TRANSFER_ACK", strlen("CERT_CHAIN_TRANSFER_ACK")) != 0) {
-		printf("ERROR: Invalid ACK from server. Exiting...\n");
-		fclose(chainFile);
-		return;
-	}
+    if (strncmp(server_reply, "CERT_CHAIN_TRANSFER_ACK", strlen("CERT_CHAIN_TRANSFER_ACK")) != 0) {
+        printf("ERROR: Invalid ACK from server. Exiting...\n");
+        fclose(chainFile);
+        return;
+    }
 
-	printf("INFO: Sending certificate chain file '%s' to server...\n", chainFileName);
+    printf("INFO: Sending certificate chain file '%s' to server...\n", chainFileName);
 
-	char buffer[4096];
-	size_t bytesRead;
-	while ((bytesRead = fread(buffer, 1, sizeof(buffer), chainFile)) > 0) {
-		if (send(socket_desc, buffer, bytesRead, 0) < 0) {
-			printf("ERROR: Failed to send certificate chain file data.\n");
-			fclose(chainFile);
-			return;
-		}
-	}
+    char buffer[1024];
+    while (fgets(buffer, sizeof(buffer), chainFile) != NULL) {
+        // Send each line to the server
+        if (send(socket_desc, buffer, strlen(buffer), 0) < 0) {
+            printf("ERROR: Failed to send certificate chain file data.\n");
+            fclose(chainFile);
+            return;
+        }
 
-	fclose(chainFile);
+        // Wait for ACK from server
+        memset(server_reply, '\0', sizeof(server_reply));
+        if (recv(socket_desc, server_reply, sizeof(server_reply), 0) <= 0) {
+            printf("ERROR: Failed to receive ACK from server. Exiting...\n");
+            fclose(chainFile);
+            return;
+        }
 
-	// Send transfer end message
-	send(socket_desc, "CERT_CHAIN_TRANSFER_END", strlen("CERT_CHAIN_TRANSFER_END"), 0);
+        if (strncmp(server_reply, "CERT_CHAIN_LINE_ACK", strlen("CERT_CHAIN_LINE_ACK")) != 0) {
+            printf("ERROR: Invalid ACK from server. Exiting...\n");
+            fclose(chainFile);
+            return;
+        }
+    }
 
-	printf("INFO: Certificate chain file sent to server.\n");
-	printf("Done! Waiting verification result\n");
+    fclose(chainFile);
 
-	memset(server_reply, '\0', sizeof(server_reply));
-	if (recv(socket_desc, server_reply, sizeof(server_reply), 0) > 0) {
-		printf("Server response:\n%s\n", server_reply);
-	} else {
-		printf("ERROR: Failed to receive server response.\n");
-	}
+    // Send transfer end message
+    send(socket_desc, "CERT_CHAIN_TRANSFER_END", strlen("CERT_CHAIN_TRANSFER_END"), 0);
 
-	return;
+    printf("INFO: Certificate chain file sent to server.\n");
+    printf("Done! Waiting verification result\n");
+
+    memset(server_reply, '\0', sizeof(server_reply));
+    if (recv(socket_desc, server_reply, sizeof(server_reply), 0) > 0) {
+        printf("Server response:\n%s\n", server_reply);
+    } else {
+        printf("ERROR: Failed to receive server response.\n");
+    }
+
+    return;
 }
 
 void sendCRLToServer(int socket_desc) {
-	// Get CRL file name
-	char crlFileName[256];
-	printf("Enter CRL file name to send to server (e.g., crl.txt): ");
-	fgets(crlFileName, sizeof(crlFileName), stdin);
-	crlFileName[strcspn(crlFileName, "\n")] = 0;
+    // Get CRL file name
+    char crlFileName[256];
+    printf("Enter CRL file name to send to server (e.g., crl.txt): ");
+    fgets(crlFileName, sizeof(crlFileName), stdin);
+    crlFileName[strcspn(crlFileName, "\n")] = 0;
 
-	FILE *crlFile = fopen(crlFileName, "rb");
-	if (!crlFile) {
-		printf("ERROR: Cannot open CRL file '%s'.\n", crlFileName);
-		return;
-	}
+    FILE *crlFile = fopen(crlFileName, "r");
+    if (!crlFile) {
+        printf("ERROR: Cannot open CRL file '%s'.\n", crlFileName);
+        return;
+    }
 
-	// Notify server about CRL transfer
-	send(socket_desc, "CRL_TRANSFER", strlen("CRL_TRANSFER"), 0);
+    // Notify server about CRL transfer
+    send(socket_desc, "CRL_TRANSFER", strlen("CRL_TRANSFER"), 0);
 
-	// Wait for ACK from server
-	char server_reply[100];
-	memset(server_reply, '\0', 100);
-	if (recv(socket_desc, server_reply, 100, 0) < 0) {
-		printf("ERROR: receive failed during CRL transfer. Exiting...\n");
-		return;
-	}
-	if (strncmp(server_reply, "CRL_TRANSFER_ACK", strlen("CRL_TRANSFER_ACK")) != 0) {
-		printf("ERROR: Invalid ACK from server. Exiting...\n");
-		return;
-	}
+    // Wait for ACK from server
+    char server_reply[100];
+    memset(server_reply, '\0', sizeof(server_reply));
+    if (recv(socket_desc, server_reply, sizeof(server_reply), 0) < 0) {
+        printf("ERROR: Receive failed during CRL transfer. Exiting...\n");
+        fclose(crlFile);
+        return;
+    }
 
-	printf("INFO: Sending CRL file '%s' to server...\n", crlFileName);
+    if (strncmp(server_reply, "CRL_TRANSFER_ACK", strlen("CRL_TRANSFER_ACK")) != 0) {
+        printf("ERROR: Invalid ACK from server. Exiting...\n");
+        fclose(crlFile);
+        return;
+    }
 
-	char buffer[1024];
-	size_t bytesRead;
-	while (fgets(buffer, sizeof(buffer), crlFile) != NULL) {
-		send(socket_desc, buffer, strlen(buffer), 0);
-	}
-	fclose(crlFile);
+    printf("INFO: Sending CRL file '%s' to server...\n", crlFileName);
 
-	// Send transfer end message
-	send(socket_desc, "CRL_TRANSFER_END", strlen("CRL_TRANSFER_END"), 0);
+    char buffer[1024];
+    while (fgets(buffer, sizeof(buffer), crlFile) != NULL) {
+        // Send each line to the server
+        if (send(socket_desc, buffer, strlen(buffer), 0) < 0) {
+            printf("ERROR: Failed to send CRL file data.\n");
+            fclose(crlFile);
+            return;
+        }
 
-	printf("INFO: CRL file sent to server.\n");
-	return;
+        // Wait for ACK from server
+        memset(server_reply, '\0', sizeof(server_reply));
+        if (recv(socket_desc, server_reply, sizeof(server_reply), 0) < 0) {
+            printf("ERROR: Failed to receive ACK from server. Exiting...\n");
+            fclose(crlFile);
+            return;
+        }
+
+        if (strncmp(server_reply, "CRL_LINE_ACK", strlen("CRL_LINE_ACK")) != 0) {
+            printf("ERROR: Invalid ACK from server. Exiting...\n");
+            fclose(crlFile);
+            return;
+        }
+    }
+
+    fclose(crlFile);
+
+    // Send transfer end message
+    send(socket_desc, "CRL_TRANSFER_END", strlen("CRL_TRANSFER_END"), 0);
+
+    printf("INFO: CRL file sent to server.\n");
+    return;
 }
 
