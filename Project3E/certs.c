@@ -20,7 +20,7 @@ void certGen(char fileName[], unsigned int privateKey, unsigned int publicKey, u
     {
         // file name
         printf("Enter output certificate file name: ");
-        fgets(fileName, sizeof(fileName), stdin);
+        fgets(fileName, strlen(fileName), stdin);
         fileName[strcspn(fileName, "\n")] = 0;
     }
     

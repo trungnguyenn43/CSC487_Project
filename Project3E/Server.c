@@ -18,23 +18,29 @@
 
 // Function prototypes
 void corectKeyLength(const int, char[4]);
-void decipherMessage(char[4], char[100], const int, bool *);
-void messageClient(char[4], char[100], bool *);
-
-unsigned int rsa_public_key = 0, rsa_private_key = 0;
-unsigned int p = 61, q = 53, n, totient_n;
+void decipherMessage(char[4], char[], const int, bool *);
+void messageClient(char[4], char[], bool *);
+void receiveCert(int);
+void sendCert(int, const char []);
+void getKeyParamsFromCert(unsigned int *, unsigned int *);
 
 // Define server port
 const int SERVER_PORT = 49152; // Port number of the server
 static char CBC_Hash_KEY[4] = "CCB"; //key for CBC Hash
 static char CBC_IV[3] = "1A"; // IV for CBC Hash
 const char CERT_FILE[] = "server_cert.txt";
+const char CERT_TEMP_FILE[] = "SV_temp_cert_file.txt";
+
+unsigned int rsa_public_key = 0, rsa_private_key = 0;
+unsigned int p = 47, q = 83, n, totient_n;
+static char SDES_KEY[4] = "000"; // SDES key placeholder
 
 int main(int argc, char *argv[])
 {	
 	int socket_desc, new_socket, c, read_size, i;
 	struct sockaddr_in server, client;
-	char client_message[100];
+	char client_message[1024]; // to receive
+	char server_message[1024]; // to send
 
 	printf("========= RSA KEY GEN ==========\n");
 	//====================================
@@ -73,6 +79,11 @@ int main(int argc, char *argv[])
 	printf("Generated RSA Public Key: %u\n", rsa_public_key);
 	printf("Generated RSA Private Key: %u\n\n", rsa_private_key);
 	
+	// Generating cert for server
+	printf("============= CERTIFICATE GENERATION ============\n");
+
+	certGen((char*) CERT_FILE, rsa_private_key, rsa_public_key, n);
+
 	printf("======= SOCKET SETUP =======\n");
 
 	// Create socket
@@ -100,12 +111,9 @@ int main(int argc, char *argv[])
 
 	// Listen
 	listen(socket_desc, 3);
-
 	bool isExit = false;
-
 	// Accept incoming connection
 	printf("INFO: Waiting for incoming connections... \n");
-
 	c = sizeof(struct sockaddr_in);
 	new_socket = accept(socket_desc, (struct sockaddr *)&client, (socklen_t *)&c);
 
@@ -118,105 +126,106 @@ int main(int argc, char *argv[])
 	printf("INFO: Connection accepted\n");
 	printf("INFO: Client connected from IP: %s, Port: %d\n\n", inet_ntoa(client.sin_addr), ntohs(client.sin_port));
 
-	// ====================================
-	// Get public key from client
-	// ====================================
-	if(recv(new_socket, client_message, 100, 0) < 0)
+	//wait for client to send certificate signal
+	recv(new_socket, client_message, sizeof(client_message), 0);
+	if (strncmp(client_message, "CERT_TRANSFER", strlen("CERT_TRANSFER")) != 0)
 	{
-		printf("ERROR: receive failed during RSA key exchange. Exiting...\n");
-		close(new_socket);
-		return 1;
-	}
-	int client_rsa_public_key, client_n;
-	sscanf(client_message, "%u %u", &client_rsa_public_key, &client_n); // just to check if it's a valid integer
-	printf("INFO: Client sent RSA public key: %s\n\n", client_message);
-
-
-	printf("========= Diff Hellman Key Exchange ==========\n");
-	// generate and display public key
-	int prime = 0;
-	int exp = 0;
-	int alpha = 0;
-	int SYM_publicKey = DiffHellman_GenPublicKey(&exp, &alpha, &prime);
-	int shareKey = -1;
-	if (SYM_publicKey == -1)
-	{
-		printf("ERROR: Unable to generate public key. Exiting...\n");
-		close(new_socket);
-		return 1;
-	}
-    printf("INFO: Using alpha: %d\n", alpha);
-	printf("INFO: Using private exponent: %d\n", exp);
-	printf("INFO: Using prime number: %d\n", prime);
-	printf("INFO: Public key: %d\n\n", SYM_publicKey);
-
-	// ====================================
-	// Generating cert
-	// ====================================
-	printf("============= CERTIFICATE GENERATION ============\n");
-	certGen(CERT_FILE, rsa_private_key, rsa_public_key, n);
-	printf("============ END OF CERTIFICATE GENERATION ============\n\n");
-	
-	
-	// ====================================
-	// send the public key to client
-	// ====================================
-	sprintf(client_message, "%d %d %d %d %u %u", SYM_publicKey, prime, alpha, rsa_public_key, n, signature);
-	write(new_socket, client_message, strlen(client_message));
-
-	// wait for client to send its public key with signature
-	memset(client_message, '\0', 100); // Clear the buffer
-	if ((read_size = recv(new_socket, client_message, 100, 0)) < 0)
-	{
-		printf("ERROR: receive failed");
-		close(new_socket);
-		return 1;
-	}
-
-	int clientPublicKey;
-	int tempPrime, tempAlpha;
-	sscanf(client_message, "%d %d %d %u", &clientPublicKey, &tempPrime, &tempAlpha, &signature); // just to check if it's a valid integer
-	printf("INFO: Client sent: %s\n", client_message);
-
-	// ==========
-	// Verifying Signature
-	// ===========
-	printf("============ SIGNATURE VERIFICATION ============\n");
-	sprintf(client_message, "%d %d %d", clientPublicKey, tempPrime, tempAlpha);
-	CBCHash(client_message, CBC_IV, CBC_Hash_KEY, tempOutputBuffer);
-	// Convert hash to numeric value
-	hashValue = (int)strtol(tempOutputBuffer, NULL, 16);
-	printf("INFO: CBC Hash of public key, prime, and alpha: %d\n", hashValue);
-	unsigned int decryptedHash = modExp(signature, client_rsa_public_key, client_n);
-	printf("INFO: Decrypted RSA signature: %u\n", decryptedHash);
-
-	if(decryptedHash != hashValue){
-		printf("WARNING: RSA signature verification failed! Be cautious...\n");
+		printf("ERROR: Invalid certificate transfer request from client. Exiting...\n");
 		close(socket_desc);
 		return 1;
-	} else {
-		printf("INFO: RSA signature verification succeeded. Continuing...\n");
 	}
 	
-	printf("============ END OF SIGNATURE VERIFICATION ============\n\n");
-	
-	shareKey = DiffHellman_GenShareKey(clientPublicKey, exp, prime);
-	printf("INFO: Shared key: %d\n", shareKey);
+	// ========== Certificate Exchange ==========
+	printf("========= RECEIVING CERTIFICATE ==========\n");
+	receiveCert(new_socket);
 
-	char key[4];					// 3 hex digits + null terminator
-	corectKeyLength(shareKey, key); // Convert int to 3-char string with leading zeros if necessary
+	printf("========= VERIFY CLIENT CERTIFICATE =========\n");
 
-	printf("INFO: Using SDES with shared key: %s\n", key);
-
-	memset(client_message, '\0', 100); // Clear the buffer
-
-	// Open a temporary file for writing
-	FILE *tempFile = fopen("server_temp_file.txt", "w");
-	if (tempFile == NULL) {
-		printf("ERROR: Unable to open temporary file for writing.\n");
-		close(new_socket);
+	if (verifyFileSignature((char*) CERT_TEMP_FILE) != 1)
+	{
+		printf("ERROR: Client certificate signature is invalid. Exiting...\n");
+		close(socket_desc);
 		return 1;
 	}
+	else
+	{
+		printf("INFO: Client certificate signature is valid.\n\n");
+	}
+	
+	unsigned int RSA_Client_PU = 0, RSA_Client_n = 0;
+	getKeyParamsFromCert(&RSA_Client_PU, &RSA_Client_n);
+
+	// ========== End Receive Client Certificate ==========
+	printf("===== SENNDING CERTIFICATE =====\n");
+	sendCert(new_socket, (char*) CERT_FILE);
+	printf("===== CERTIFICATE EXCHANGE COMPLETE =====\n\n");
+
+	// Diffie-Hellman Key Exchange
+	printf("===== DIFFIE-HELLMAN KEY EXCHANGE =====\n");
+	int DF_prime = 0, DF_alpha = 0, DF_privateKey = 0, DF_publicKey = 0, DF_sharedKey = -1;
+
+	DF_publicKey = DiffHellman_GenPublicKey(&DF_privateKey, &DF_alpha, &DF_prime);
+	printf("INFO: Using alpha: %d and prime: %d\n", DF_alpha, DF_prime);
+	printf("INFO: Private Key (exp): %d\n", DF_privateKey);
+	printf("INFO: Public Key: %d\n\n", DF_publicKey);
+
+	unsigned int enc_DF_publicKey = modExp(DF_publicKey, RSA_Client_PU, RSA_Client_n);
+	unsigned int enc_DF_prime = modExp(DF_prime, RSA_Client_PU, RSA_Client_n);
+	unsigned int enc_DF_alpha = modExp(DF_alpha, RSA_Client_PU, RSA_Client_n);
+
+	sprintf(server_message, "%u %u %u", enc_DF_publicKey, enc_DF_prime, enc_DF_alpha);
+	
+	// hash the message
+	{
+		char tempHash[3];
+		CBCHash(server_message, CBC_IV, CBC_Hash_KEY, tempHash);
+		unsigned int hashValue = (unsigned int)strtol(tempHash, NULL, 16);
+		unsigned int signature = modExp(hashValue, rsa_private_key, n);
+		sprintf(server_message, "%u %u %u %u", enc_DF_publicKey, enc_DF_prime, enc_DF_alpha, signature);
+	}
+	
+	//send to client
+	printf("Sending message: %s\n", server_message);
+	send(new_socket, server_message, strlen(server_message), 0);
+	printf("INFO: Sent encrypted Diffie-Hellman parameters to client.\n");
+	
+	//receive client's public key
+	memset(client_message, '\0', sizeof(client_message));
+	recv(new_socket, client_message, sizeof(client_message), 0);
+	{	
+		printf("Message: %s\n", client_message);
+		unsigned int signature = 0;
+		sscanf(client_message, "%u %u", &enc_DF_publicKey, &signature);
+
+		sprintf(client_message, "%u", enc_DF_publicKey);
+
+		char tempHash[3];
+		CBCHash(client_message, CBC_IV, CBC_Hash_KEY, tempHash);
+		unsigned int hashValue = (unsigned int)strtol(tempHash, NULL, 16);
+		unsigned int decryptedSignature = modExp(signature, RSA_Client_PU, RSA_Client_n);
+		
+		if (hashValue != decryptedSignature)
+		{
+			printf("ERROR: Invalid signature from client. Exiting...\n");
+			close(socket_desc);
+			return 1;
+		}
+		else
+		{
+			printf("INFO: Valid signature from client.\n");
+		}
+	}
+
+	int DF_client_publicKey = modExp(enc_DF_publicKey, rsa_private_key, n);
+	printf("INFO: Received Client's Diffie-Hellman Public Key: %d\n", DF_client_publicKey);
+	DF_sharedKey = DiffHellman_GenShareKey(DF_client_publicKey, DF_privateKey, DF_prime);
+
+	printf("INFO: Generated Shared Secret Key: %d\n", DF_sharedKey);
+	corectKeyLength(DF_sharedKey, SDES_KEY);
+	printf("INFO: SDES Key (last 3 hex digits of shared key): %s\n\n", SDES_KEY);
+	
+	// ========== End Diffie-Hellman Key Exchange ==========
+
 
 	// Server will start receive first
 	printf("\n===== MESSAGE EXCHANGE SESSION =====\n");
@@ -224,7 +233,7 @@ int main(int argc, char *argv[])
 
 	while (!isExit) {
 		// Receive a message from client
-		if ((read_size = recv(new_socket, client_message, 100, 0)) > 0) {
+		if ((read_size = recv(new_socket, client_message, sizeof(client_message), 0)) > 0) {
 			if (read_size == -1) {
 				printf("ERROR: receive failed\n");
 				isExit = true;
@@ -233,14 +242,7 @@ int main(int argc, char *argv[])
 
 			printf("INFO: Client sent %d byte message:  %s\n", read_size, client_message);
 
-			// Write the received message to the temporary file
-			if (fwrite(client_message, sizeof(char), read_size, tempFile) < read_size) {
-				printf("ERROR: Failed to write to temporary file.\n");
-				isExit = true;
-				break;
-			}
-
-			decipherMessage(key, client_message, read_size, &isExit);
+			decipherMessage(SDES_KEY, client_message, read_size, &isExit);
 
 			/*
 				If the client sent an exit message with the correct key, the isExit flag will be set to true
@@ -251,7 +253,7 @@ int main(int argc, char *argv[])
 				break;
 
 			// write message back to client
-			messageClient(key, client_message, &isExit);
+			messageClient(SDES_KEY, client_message, &isExit);
 
 			// send the encrypted message to client
 			write(new_socket, client_message, strlen(client_message));
@@ -264,9 +266,6 @@ int main(int argc, char *argv[])
 			memset(client_message, '\0', 100); // Clear the buffer for next message
 		}
 	}
-
-	// Close the temporary file
-	fclose(tempFile);
 
 	// Free character arrays
 	memset(client_message, '\0', 100); // Clear the buffer
@@ -285,7 +284,7 @@ void corectKeyLength(const int key, char keyStr[4])
 	keyStr[3] = '\0';
 }
 
-void decipherMessage(char key[4], char client_message[100], const int read_size, bool *isExit)
+void decipherMessage(char key[4], char client_message[], const int read_size, bool *isExit)
 {
 	char tempMessage[read_size / 2 + 1]; // 2 hex digits, +1 for null terminator
 	memset(tempMessage, '\0', sizeof(tempMessage));
@@ -315,7 +314,7 @@ void decipherMessage(char key[4], char client_message[100], const int read_size,
 	printf("=== END OF MESSAGE ===\n\n");
 }
 
-void messageClient(char key[4], char client_message[100], bool *isExit)
+void messageClient(char key[4], char client_message[], bool *isExit)
 {
 	// Clear buffer
 	memset(client_message, '\0', sizeof(*client_message));
@@ -358,4 +357,149 @@ void messageClient(char key[4], char client_message[100], bool *isExit)
 
 	strcpy(client_message, hexMessage); // Copy the encrypted hex message to client_message
 	printf("INFO: Encrypted message to be sent: %s\n\n", client_message);
+}
+
+void sendCert(int socket_desc, const char certFileName[]){
+	
+	//getting file name
+	if(strlen(certFileName) == 0){
+		char certFileName[100];
+		printf("Enter certificate file name to send to server (e.g., cert.txt): ");
+		fgets(certFileName, sizeof(certFileName), stdin);
+		certFileName[strcspn(certFileName, "\n")] = 0; // Remove newline character
+	}
+
+	// Open cert file to send its contents to server
+	FILE *certFile = fopen(certFileName, "r");
+	if (!certFile) {
+		printf("ERROR: Cannot open certificate file '%s'.\n", certFileName);
+		return;
+	}
+
+	// Notify server about certificate transfer
+	send(socket_desc, "CERT_TRANSFER", strlen("CERT_TRANSFER"), 0);
+
+	// ACK from server
+	char server_reply[100];
+	memset(server_reply, '\0', 100); // Clear the buffer
+	if (recv(socket_desc, server_reply, 100, 0) < 0)
+	{	
+		printf("ERROR: receive failed during certificate transfer. Exiting...\n");
+		return;
+	}
+
+	if(strncmp(server_reply, "CERT_TRANSFER_ACK", strlen("CERT_TRANSFER_ACK")) != 0){
+		printf("ERROR: Invalid ACK from server. Exiting...\n");
+		return;
+	}
+
+	printf("INFO: Sending certificate file '%s' to server...\n", certFileName);
+
+	char buffer[1024];
+	//send chunks of data to server
+	while(fgets(buffer, sizeof(buffer), certFile) != NULL) {
+		// Send each line to server
+		if (send(socket_desc, buffer, strlen(buffer), 0) < 0) {
+			printf("ERROR: Failed to send certificate file data.\n");
+			fclose(certFile);
+			return;
+		}
+
+		// Wait for ACK from server
+		memset(server_reply, '\0', 100); // Clear the buffer
+		if (recv(socket_desc, server_reply, 100, 0) < 0) {
+			printf("ERROR: receive failed during certificate transfer. Exiting...\n");
+			fclose(certFile);
+			return;
+		}
+
+		if (strncmp(server_reply, "CERT_LINE_ACK", strlen("CERT_LINE_ACK")) != 0) {
+			printf("ERROR: Invalid line ACK from server. Exiting...\n");
+			fclose(certFile);
+			return;
+		}
+	}
+
+	fclose(certFile);
+
+	// Send transfer end message
+	send(socket_desc, "CERT_TRANSFER_END", strlen("CERT_TRANSFER_END"), 0);
+
+	printf("INFO: Certificate file sent to server.\n");
+	return;
+}
+
+void receiveCert(int socket_desc) {
+
+    // Acknowledge the certificate transfer request
+    send(socket_desc, "CERT_TRANSFER_ACK", strlen("CERT_TRANSFER_ACK"), 0);
+	
+    char client_message[1024]; // Buffer for receiving data
+    memset(client_message, '\0', sizeof(client_message));
+	
+    printf("INFO: Receiving certificate file from client...\n");
+
+	FILE *tempFile = fopen(CERT_TEMP_FILE, "w");
+	if (!tempFile) {
+		printf("ERROR: Cannot open temp file for writing.\n");
+		return;
+	}
+
+	while(1){
+		if(recv(socket_desc, client_message, sizeof(client_message), 0) < 0){
+			printf("ERROR: receive failed during certificate transfer. Exiting...\n");
+			fclose(tempFile);
+			return;
+		}
+
+		// Check for transfer end message
+		if (strncmp(client_message, "CERT_TRANSFER_END", strlen("CERT_TRANSFER_END")) == 0) {
+			printf("INFO: Certificate transfer complete.\n");
+			break;
+		}
+
+		if(send(socket_desc, "CERT_LINE_ACK", strlen("CERT_LINE_ACK"), 0) < 0) // Send ACK for each line received
+		{
+			printf("ERROR: send failed during certificate transfer. Exiting...\n");
+			fclose(tempFile);
+			return;
+		}
+
+		// Write the received line to the temp file
+		if (fwrite(client_message, 1, strlen(client_message), tempFile) < strlen(client_message)) {
+			printf("ERROR: Failed to write to temporary file.\n");
+			fclose(tempFile);
+			return;
+		}
+
+		memset(client_message, '\0', sizeof(client_message)); // Clear the buffer for next line
+	}
+
+	fclose(tempFile);
+	printf("INFO: Certificate file saved to temp_cert_file.txt\n");
+	printf("Done \n");
+
+	return;
+}
+
+void getKeyParamsFromCert(unsigned int *publicKey, unsigned int *n)
+{
+	FILE *certFile = fopen(CERT_TEMP_FILE, "r");
+	if (!certFile) {
+		printf("ERROR: Cannot open certificate file '%s'.\n", CERT_TEMP_FILE);
+		return;
+	}
+
+	char inputBuffer[256];
+	// Read through the certificate file to find the Public Key line
+	while (fgets(inputBuffer, sizeof(inputBuffer), certFile) != NULL) {
+		if (strncmp(inputBuffer, "Public Key:", 11) == 0) {
+			// extract public key and n
+            sscanf(inputBuffer, "Public Key: %u %u", publicKey, n);
+            // append to valueString
+			break;
+		}
+	}
+
+	fclose(certFile);
 }
