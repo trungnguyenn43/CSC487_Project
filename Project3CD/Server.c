@@ -471,6 +471,10 @@ void receiveCertChainFile(int socket_desc, const crlEntry crlEntries[], const in
 
     // Verify the certificate chain
     chainVerify(socket_desc, "SV_temp_chain_file.txt", crlEntries, numCrlEntries);
+
+	// send chain verify done
+	send(socket_desc, "CERT_CHAIN_VERIFICATION_DONE", strlen("CERT_CHAIN_VERIFICATION_DONE"), 0);
+
     return;
 }
 
@@ -539,9 +543,7 @@ int getCertsInChain(certInfo certs[], int *certCount) {
 	return 0;
 }
 
-// chainValidate.
-// Return minimum trust level if valid,
-// -1 if invalid cert, -2 if error opening file
+
 void chainVerify(int socket_desc, char *crlFileName, const crlEntry crlEntries[], const int numCrlEntries) {
 	certInfo certs[30];
 	int certCount = 0;
@@ -553,7 +555,6 @@ void chainVerify(int socket_desc, char *crlFileName, const crlEntry crlEntries[]
 		send(socket_desc, client_message, strlen(client_message), 0);
 		return;
 	}
-
 
 	// Root trusted issuer list (always trusted)
 	const char* ROOT_TRUSTED_CA[] = {"Norman"};
@@ -640,17 +641,24 @@ void chainVerify(int socket_desc, char *crlFileName, const crlEntry crlEntries[]
 				}
 			}
 		}
+		
 		if(!addedNewTrusted) {
 			break; // No new trusted issuers added, exit loop
 		}
 	}
 
-
 	int trustLevel = -1;
 	int chainBreakPoint = -1;
 	// 3. check if all certs are trusted
 	for(int i = 0; i < certCount; i++) {
+		
+		memset(client_message, '\0', sizeof(client_message));
+
 		if(certValid[i] == false){
+			sprintf(client_message, 
+				"\tCertificate with Serial Number %s is invalid (expired/revoked/invalid signature).\n", 
+				certs[i].serialNumber);
+			send(socket_desc, client_message, strlen(client_message), 0);
 			continue; // skip invalid certs
 		}
 
@@ -664,7 +672,14 @@ void chainVerify(int socket_desc, char *crlFileName, const crlEntry crlEntries[]
 		}
 
 		if(!isTrusted) {
-			chainBreakPoint = i;
+			if(chainBreakPoint == -1){
+				chainBreakPoint = i;
+			}
+			sprintf(client_message, 
+				"\tCertificate with Serial Number %s is not trusted. Issuer %s is not trusted.\n", 
+				certs[i].serialNumber, 
+				certs[i].issuerName);
+			send(socket_desc, client_message, strlen(client_message), 0);
 			continue;
 		} else {
 			// Update trust level
@@ -675,12 +690,17 @@ void chainVerify(int socket_desc, char *crlFileName, const crlEntry crlEntries[]
 	}
 
 	// If there is a break point, report failure
-	if(chainBreakPoint != -1){
+	if(chainBreakPoint != -1 && trustLevel != -1) {
 		sprintf(client_message, 
 			"Unable to verify complete chain. Chain verified to %s with a chain TL of %d. No cert available for %s\n", 
-			certs[chainBreakPoint].issuerName
-			, trustLevel, 
+			certs[chainBreakPoint].issuerName, 
+			trustLevel,
 			certs[chainBreakPoint].issuerName);
+		send(socket_desc, client_message, strlen(client_message), 0);
+		return;
+	}
+	else if(trustLevel == -1 && chainBreakPoint != -1) {
+		sprintf(client_message, "No valid and trusted certificates found in the chain.\n");
 		send(socket_desc, client_message, strlen(client_message), 0);
 		return;
 	}
@@ -688,6 +708,7 @@ void chainVerify(int socket_desc, char *crlFileName, const crlEntry crlEntries[]
 	// If all certs are valid and trusted, report success and show trusted subjects
 	sprintf(client_message, "Certificate chain verified successfully. Chain Trust Level: %d\n", trustLevel);
 	send(socket_desc, client_message, strlen(client_message), 0);
+	
 	return;
 }
 

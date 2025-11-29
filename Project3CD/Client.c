@@ -495,11 +495,32 @@ void sendCertChainToServer(int socket_desc, char key[4]) {
     printf("Done! Waiting verification result\n");
 
     memset(server_reply, '\0', sizeof(server_reply));
-    if (recv(socket_desc, server_reply, sizeof(server_reply), 0) > 0) {
-        printf("Server response:\n%s\n", server_reply);
-    } else {
-        printf("ERROR: Failed to receive server response.\n");
-    }
+    
+	printf("Server responses:\n");
+	
+	bool isExit = false;
+	while (!isExit) {
+		int bytes_received = recv(socket_desc, server_reply, sizeof(server_reply) - 1, 0);
+		if (bytes_received <= 0) {
+			printf("ERROR: Failed to receive server response.\n");
+			break;
+		}
+
+		server_reply[bytes_received] = '\0'; // Null-terminate the received string
+
+		char *line = strtok(server_reply, "\n");
+		while (line != NULL) {
+			if (strstr(line, "CERT_CHAIN_VERIFICATION_DONE")) {
+				isExit = true;
+				break;
+			}
+			printf("%s\n", line);
+			line = strtok(NULL, "\n");
+		}
+
+		memset(server_reply, '\0', sizeof(server_reply));
+
+	}
 
     return;
 }
